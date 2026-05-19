@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import re
 import uuid
-from datetime import datetime, date
+import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 try:
@@ -30,7 +31,8 @@ except ImportError:
 st.set_page_config(
     page_title="LexMonitor AI",
     page_icon="⚖️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 CSV_LOCAL = "expedientes_lexmonitor.csv"
@@ -54,30 +56,62 @@ HEADERS = [
 
 
 # ============================================================
-# ESTILOS VISUALES
+# ESTILOS
 # ============================================================
 
 st.markdown(
     """
     <style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+
+    .block-container {
+        padding-top: 1.5rem;
+        padding-left: 3rem;
+        padding-right: 3rem;
+    }
+
     .main {
-        background: linear-gradient(135deg, #f4f7fb 0%, #e9eef7 100%);
+        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    }
+
+    .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .topbar-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .topbar-user {
+        font-size: 0.9rem;
+        color: #6b7280;
     }
 
     .login-wrapper {
-        max-width: 500px;
+        max-width: 520px;
         margin: 5rem auto 2rem auto;
-        padding: 2.7rem;
+        padding: 2.8rem;
         background: white;
-        border-radius: 28px;
-        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.14);
+        border-radius: 30px;
+        box-shadow: 0 25px 70px rgba(15, 23, 42, 0.15);
         border: 1px solid #e5e7eb;
         text-align: center;
     }
 
     .login-icon {
-        width: 78px;
-        height: 78px;
+        width: 82px;
+        height: 82px;
         margin: 0 auto 1rem auto;
         border-radius: 50%;
         background: #1e3a8a;
@@ -85,15 +119,26 @@ st.markdown(
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 36px;
+        font-size: 38px;
         font-weight: bold;
+    }
+
+    .login-badge {
+        display: inline-block;
+        background: #eff6ff;
+        color: #1d4ed8;
+        padding: 0.4rem 0.9rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
     }
 
     .login-title {
         font-size: 2rem;
         font-weight: 850;
         color: #111827;
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.4rem;
     }
 
     .login-subtitle {
@@ -102,31 +147,62 @@ st.markdown(
         margin-bottom: 1.8rem;
     }
 
-    .login-badge {
-        display: inline-block;
-        background: #eff6ff;
-        color: #1d4ed8;
-        padding: 0.38rem 0.85rem;
-        border-radius: 999px;
-        font-size: 0.82rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
+    .blank-selection {
+        min-height: 72vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .selection-card {
+        background: white;
+        border-radius: 30px;
+        padding: 3rem;
+        width: 100%;
+        max-width: 900px;
+        box-shadow: 0 25px 70px rgba(15, 23, 42, 0.12);
+        border: 1px solid #e5e7eb;
+    }
+
+    .selection-title {
+        text-align: center;
+        font-size: 1.7rem;
+        font-weight: 850;
+        color: #111827;
+        margin-bottom: 0.4rem;
+    }
+
+    .selection-subtitle {
+        text-align: center;
+        color: #6b7280;
+        margin-bottom: 2rem;
     }
 
     .role-card {
         padding: 2rem;
         border-radius: 24px;
-        background: white;
+        background: #ffffff;
         border: 1px solid #e5e7eb;
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+        box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
         text-align: center;
-        min-height: 225px;
+        min-height: 230px;
+        margin-bottom: 1rem;
+    }
+
+    .role-card-debt {
+        padding: 2rem;
+        border-radius: 24px;
+        background: #fff7ed;
+        border: 2px solid #f97316;
+        box-shadow: 0 18px 45px rgba(249, 115, 22, 0.22);
+        text-align: center;
+        min-height: 230px;
         margin-bottom: 1rem;
     }
 
     .role-icon {
-        font-size: 2.3rem;
-        margin-bottom: 0.7rem;
+        font-size: 2.4rem;
+        margin-bottom: 0.8rem;
     }
 
     .role-title {
@@ -139,8 +215,18 @@ st.markdown(
     .role-text {
         font-size: 0.98rem;
         color: #6b7280;
-        margin-bottom: 1rem;
         line-height: 1.5;
+    }
+
+    .debt-alert {
+        background: #fff7ed;
+        border: 1px solid #fdba74;
+        border-left: 6px solid #f97316;
+        border-radius: 18px;
+        padding: 1rem 1.3rem;
+        margin-bottom: 1.5rem;
+        color: #7c2d12;
+        font-weight: 650;
     }
 
     .panel {
@@ -179,7 +265,7 @@ st.markdown(
     div.stButton > button {
         border-radius: 13px;
         font-weight: 750;
-        padding: 0.7rem 1rem;
+        padding: 0.72rem 1rem;
     }
 
     div[data-testid="stFileUploader"] {
@@ -204,13 +290,27 @@ if "autenticado" not in st.session_state:
 if "perfil" not in st.session_state:
     st.session_state.perfil = None
 
-if "ultimo_codigo_generado" not in st.session_state:
-    st.session_state.ultimo_codigo_generado = None
+if "usuario_nombre" not in st.session_state:
+    st.session_state.usuario_nombre = ""
+
+if "registro_demandado" not in st.session_state:
+    st.session_state.registro_demandado = None
+
+if "mostrar_oposicion" not in st.session_state:
+    st.session_state.mostrar_oposicion = False
 
 
 # ============================================================
-# GOOGLE SHEETS / CSV LOCAL
+# UTILIDADES
 # ============================================================
+
+def normalizar_texto(texto):
+    texto = str(texto or "").strip().lower()
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    texto = re.sub(r"\s+", " ", texto)
+    return texto
+
 
 def google_sheets_disponible():
     return (
@@ -335,6 +435,33 @@ def buscar_por_codigo(codigo):
     return df[mask].iloc[0].to_dict()
 
 
+def buscar_deudas_por_nombre(nombre):
+    df = cargar_registros()
+
+    if df.empty or "demandado" not in df.columns:
+        return pd.DataFrame(columns=HEADERS)
+
+    nombre_norm = normalizar_texto(nombre)
+
+    estados_pendientes = [
+        "pendiente de respuesta del deudor",
+        "pendiente de subsanación",
+        "sin pago ni oposición"
+    ]
+
+    df["demandado_norm"] = df["demandado"].apply(normalizar_texto)
+    df["estado_norm"] = df["estado"].apply(normalizar_texto)
+
+    coincidencias = df[
+        (df["demandado_norm"] == nombre_norm)
+        & (df["estado_norm"].isin(estados_pendientes))
+    ].copy()
+
+    coincidencias = coincidencias.drop(columns=["demandado_norm", "estado_norm"], errors="ignore")
+
+    return coincidencias
+
+
 # ============================================================
 # LECTURA DE DOCUMENTOS
 # ============================================================
@@ -400,12 +527,10 @@ def limpiar_numero(texto_numero):
     if not texto_numero:
         return 0.0
 
-    texto_numero = texto_numero.lower()
-    texto_numero = texto_numero.replace("lempiras", "")
+    texto_numero = str(texto_numero).lower()
     texto_numero = texto_numero.replace("euros", "")
+    texto_numero = texto_numero.replace("euro", "")
     texto_numero = texto_numero.replace("€", "")
-    texto_numero = texto_numero.replace("l.", "")
-    texto_numero = texto_numero.replace("l ", "")
     texto_numero = texto_numero.strip()
 
     if "," in texto_numero and "." in texto_numero:
@@ -446,8 +571,6 @@ def detectar_documentos_art_812(texto):
             "firmado por el deudor",
             "firma del deudor",
             "sello del deudor",
-            "impronta",
-            "marca del deudor",
             "firma electrónica",
             "señal electrónica",
             "documento firmado"
@@ -457,7 +580,6 @@ def detectar_documentos_art_812(texto):
             "facturas",
             "albarán",
             "albaranes",
-            "albarán de entrega",
             "certificación",
             "certificaciones",
             "telegrama",
@@ -480,10 +602,8 @@ def detectar_documentos_art_812(texto):
         ],
         "Certificación de impago de comunidad de propietarios": [
             "certificación de impago",
-            "certificaciones de impago",
             "gastos comunes",
             "comunidad de propietarios",
-            "inmueble urbano",
             "cuotas comunitarias"
         ],
     }
@@ -536,12 +656,11 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
     cuantia_txt = buscar_patron(
         texto_unido,
         [
-            r"cuantía[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
-            r"importe[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
-            r"cantidad[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
-            r"suma[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
-            r"reclama(?:\s+la)?\s+cantidad\s+de\s+(?:L\.?\s*)?([\d\.,]+)",
-            r"por\s+importe\s+de\s+(?:L\.?\s*)?([\d\.,]+)",
+            r"cuantía[:\s]+(?:de\s*)?(?:€\s*)?([\d\.,]+)",
+            r"importe[:\s]+(?:de\s*)?(?:€\s*)?([\d\.,]+)",
+            r"cantidad[:\s]+(?:de\s*)?(?:€\s*)?([\d\.,]+)",
+            r"reclama(?:\s+la)?\s+cantidad\s+de\s+(?:€\s*)?([\d\.,]+)",
+            r"por\s+importe\s+de\s+(?:€\s*)?([\d\.,]+)",
         ]
     )
 
@@ -587,12 +706,11 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
         "categoria_art_812": categorias_detectadas_texto(documentos_art_812),
         "datos_faltantes": datos_faltantes,
         "cumple_requisitos_auto": cumple_requisitos_auto,
-        "hechos_resumidos": texto_unido[:1000],
     }
 
 
 # ============================================================
-# CÓDIGOS Y BORRADORES
+# BORRADORES
 # ============================================================
 
 def generar_codigo():
@@ -614,9 +732,6 @@ Documentación detectada:
 
 En consecuencia, procede admitir la solicitud monitoria y requerir al deudor para que pague la cantidad reclamada o formule oposición en el plazo legalmente previsto.
 
-Actuación recomendada:
-{registro['accion_recomendada']}
-
 Documento generado automáticamente para revisión humana.
 """.strip()
 
@@ -628,11 +743,6 @@ AUTO DE REQUERIMIENTO DE SUBSANACIÓN
 Código de expediente: {registro['codigo']}
 
 Examinada la solicitud presentada por {registro['demandante']} frente a {registro['demandado']}, se aprecia que no constan todos los elementos necesarios para su admisión inicial.
-
-Datos o documentos pendientes:
-{registro.get('documentacion_detectada', '')}
-
-En consecuencia, procede requerir a la parte solicitante para que subsane o complete la documentación necesaria.
 
 Actuación recomendada:
 {registro['accion_recomendada']}
@@ -655,7 +765,7 @@ Documento generado automáticamente para revisión humana.
 
 def generar_borrador_oposicion(registro, motivo):
     return f"""
-ESCRITO / REGISTRO DE OPOSICIÓN
+REGISTRO DE OPOSICIÓN
 
 Código de expediente: {registro['codigo']}
 
@@ -664,7 +774,7 @@ La parte demandada manifiesta su oposición al pago reclamado por {registro['dem
 Cantidad reclamada:
 {registro['cuantia']} euros
 
-Motivo de oposición indicado:
+Motivo de oposición:
 {motivo}
 
 Actuación recomendada:
@@ -690,7 +800,7 @@ Documento generado automáticamente para revisión humana.
 
 
 # ============================================================
-# LOGIN Y SELECCIÓN DE PERFIL
+# LOGIN
 # ============================================================
 
 def pantalla_login():
@@ -711,25 +821,91 @@ def pantalla_login():
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
+        nombre = st.text_input(
+            "Nombre y apellidos",
+            placeholder="Introduce tu nombre completo"
+        )
+
         certificado = st.file_uploader(
-            "Selecciona tu certificado digital",
-            type=["pdf", "txt", "cer", "crt", "p12", "pfx"],
-            label_visibility="collapsed"
+            "Certificado digital",
+            type=["pdf", "txt", "cer", "crt", "p12", "pfx"]
         )
 
         entrar = st.button(
-            "Acceder con certificado digital",
+            "Acceder",
             use_container_width=True,
-            disabled=certificado is None
+            disabled=not nombre.strip() or certificado is None
         )
 
-        if entrar and certificado is not None:
+        if entrar:
             st.session_state.autenticado = True
+            st.session_state.usuario_nombre = nombre.strip()
+            st.session_state.perfil = None
             st.rerun()
 
 
+# ============================================================
+# CABECERA SIN MENÚ LATERAL
+# ============================================================
+
+def topbar():
+    col1, col2 = st.columns([8, 1.4])
+
+    with col1:
+        st.markdown(
+            f"""
+            <div class="topbar">
+                <div>
+                    <div class="topbar-title">LexMonitor AI</div>
+                    <div class="topbar-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with col2:
+        if st.button("Cerrar sesión", use_container_width=True):
+            st.session_state.autenticado = False
+            st.session_state.perfil = None
+            st.session_state.usuario_nombre = ""
+            st.session_state.registro_demandado = None
+            st.session_state.mostrar_oposicion = False
+            st.rerun()
+
+
+# ============================================================
+# PANTALLA EN BLANCO CON DEMANDANTE / DEMANDADO
+# ============================================================
+
 def pantalla_perfiles():
-    st.title("Selecciona tu perfil de acceso")
+    deudas = buscar_deudas_por_nombre(st.session_state.usuario_nombre)
+    tiene_deudas = not deudas.empty
+
+    st.markdown('<div class="blank-selection">', unsafe_allow_html=True)
+    st.markdown('<div class="selection-card">', unsafe_allow_html=True)
+
+    st.markdown(
+        """
+        <div class="selection-title">¿Cómo quieres acceder?</div>
+        <div class="selection-subtitle">Selecciona el perfil con el que vas a operar.</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if tiene_deudas:
+        codigos = ", ".join(deudas["codigo"].astype(str).tolist())
+
+        st.markdown(
+            f"""
+            <div class="debt-alert">
+                Tienes una deuda pendiente asociada a tu nombre.
+                <br>
+                Código de deuda: <b>{codigos}</b>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     col1, col2 = st.columns(2)
 
@@ -740,8 +916,7 @@ def pantalla_perfiles():
                 <div class="role-icon">📄</div>
                 <div class="role-title">Demandante / Acreedor</div>
                 <div class="role-text">
-                    Presenta una solicitud monitoria, aporta documentación
-                    y genera el código de expediente.
+                    Presentar una solicitud monitoria y aportar documentación.
                 </div>
             </div>
             """,
@@ -753,14 +928,21 @@ def pantalla_perfiles():
             st.rerun()
 
     with col2:
+        clase = "role-card-debt" if tiene_deudas else "role-card"
+
+        texto = (
+            "Tienes una reclamación pendiente. Consulta el expediente y selecciona una actuación."
+            if tiene_deudas
+            else "Consultar una reclamación mediante código y responder."
+        )
+
         st.markdown(
-            """
-            <div class="role-card">
+            f"""
+            <div class="{clase}">
                 <div class="role-icon">💼</div>
                 <div class="role-title">Demandado / Deudor</div>
                 <div class="role-text">
-                    Consulta una reclamación mediante código y selecciona
-                    pagar, oponerte o no comparecer.
+                    {texto}
                 </div>
             </div>
             """,
@@ -769,7 +951,15 @@ def pantalla_perfiles():
 
         if st.button("Entrar como Demandado", use_container_width=True):
             st.session_state.perfil = "demandado"
+
+            if tiene_deudas:
+                primer_registro = deudas.iloc[0].to_dict()
+                st.session_state.registro_demandado = primer_registro
+
             st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
@@ -777,17 +967,13 @@ def pantalla_perfiles():
 # ============================================================
 
 def pantalla_demandante():
-    st.title("Zona del Demandante / Acreedor")
+    topbar()
 
-    st.markdown(
-        """
-        <div class="status-box">
-            Presenta la solicitud monitoria mediante una plantilla ya rellenada
-            o completando el formulario desde la aplicación.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    if st.button("← Volver", use_container_width=False):
+        st.session_state.perfil = None
+        st.rerun()
+
+    st.title("Zona del Demandante / Acreedor")
 
     modo = st.radio(
         "Elige cómo quieres presentar la solicitud",
@@ -802,7 +988,7 @@ def pantalla_demandante():
     texto_documentos = ""
 
     datos_manual = {
-        "demandante": "",
+        "demandante": st.session_state.usuario_nombre,
         "demandado": "",
         "cuantia": 0.0,
         "concepto_deuda": ""
@@ -821,15 +1007,21 @@ def pantalla_demandante():
             texto_demanda = leer_documento(demanda_file)
 
             with st.expander("Ver texto leído de la solicitud"):
-                st.text_area("Texto detectado", texto_demanda, height=240)
+                st.text_area("Texto detectado", texto_demanda, height=220)
 
     else:
         st.subheader("1. Rellenar formulario de solicitud monitoria")
 
         c1, c2 = st.columns(2)
 
-        datos_manual["demandante"] = c1.text_input("Demandante / acreedor")
-        datos_manual["demandado"] = c2.text_input("Demandado / deudor")
+        datos_manual["demandante"] = c1.text_input(
+            "Demandante / acreedor",
+            value=st.session_state.usuario_nombre
+        )
+
+        datos_manual["demandado"] = c2.text_input(
+            "Demandado / deudor"
+        )
 
         datos_manual["cuantia"] = st.number_input(
             "Cuantía reclamada",
@@ -850,10 +1042,10 @@ def pantalla_demandante():
         Solicito la tramitación de proceso monitorio.
         """
 
-    st.subheader("2. Subir documentos acreditativos art. 812 LEC")
+    st.subheader("2. Subir documentos acreditativos")
 
     documentos_files = st.file_uploader(
-        "Sube facturas, albaranes, certificaciones, documentos firmados, documentos comerciales o certificaciones de impago",
+        "Sube facturas, albaranes, certificaciones, documentos firmados o documentos comerciales",
         type=["pdf", "docx", "txt"],
         accept_multiple_files=True,
         key="documentos_acreditativos"
@@ -871,7 +1063,7 @@ def pantalla_demandante():
         texto_documentos = "\n".join(textos_docs)
 
         with st.expander("Ver texto leído de los documentos"):
-            st.text_area("Documentos detectados", texto_documentos, height=240)
+            st.text_area("Documentos detectados", texto_documentos, height=220)
 
     st.subheader("3. Comprobación y generación de código")
 
@@ -881,10 +1073,10 @@ def pantalla_demandante():
             "demandado": datos_manual["demandado"],
             "cuantia": datos_manual["cuantia"],
             "concepto_deuda": datos_manual["concepto_deuda"],
-            "hechos_resumidos": texto_demanda[:1000]
         }
 
         hay_doc, documentos_art_812 = detectar_documentos_art_812(texto_documentos)
+
         datos_extraidos["hay_documento_deuda"] = hay_doc
         datos_extraidos["documentos_art_812"] = documentos_art_812
         datos_extraidos["categoria_art_812"] = categorias_detectadas_texto(documentos_art_812)
@@ -905,17 +1097,17 @@ def pantalla_demandante():
     else:
         datos_extraidos = extraer_datos_demanda(texto_demanda, texto_documentos)
 
-    col1, col2, col3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
-    col1.metric("Demandante", datos_extraidos["demandante"] or "No detectado")
-    col2.metric("Demandado", datos_extraidos["demandado"] or "No detectado")
-    col3.metric("Cuantía", f"{float(datos_extraidos['cuantia']):,.2f}")
+    c1.metric("Demandante", datos_extraidos["demandante"] or "No detectado")
+    c2.metric("Demandado", datos_extraidos["demandado"] or "No detectado")
+    c3.metric("Cuantía", f"{float(datos_extraidos['cuantia']):,.2f} €")
 
     if datos_extraidos["hay_documento_deuda"]:
         st.markdown(
             """
             <div class="success-box">
-                Documentación acreditativa detectada conforme al art. 812 LEC.
+                Documentación acreditativa detectada.
             </div>
             """,
             unsafe_allow_html=True
@@ -985,7 +1177,6 @@ def pantalla_demandante():
         registro["borrador"] = borrador
 
         destino = guardar_registro(registro)
-        st.session_state.ultimo_codigo_generado = codigo
 
         st.success(f"Código generado correctamente: {codigo}")
 
@@ -994,21 +1185,8 @@ def pantalla_demandante():
         else:
             st.info("Registro guardado en CSV local.")
 
-        st.subheader("Resumen del expediente generado")
-
-        st.json({
-            "codigo": codigo,
-            "estado": estado,
-            "demandante": registro["demandante"],
-            "demandado": registro["demandado"],
-            "cuantia": registro["cuantia"],
-            "documentacion_detectada": registro["documentacion_detectada"],
-            "categoria_art_812": registro["categoria_art_812"],
-            "accion_recomendada": registro["accion_recomendada"]
-        })
-
         st.subheader("Borrador generado")
-        st.text_area("Borrador", borrador, height=360)
+        st.text_area("Borrador", borrador, height=330)
 
         st.download_button(
             "Descargar borrador",
@@ -1023,20 +1201,34 @@ def pantalla_demandante():
 # ============================================================
 
 def pantalla_demandado():
+    topbar()
+
+    if st.button("← Volver", use_container_width=False):
+        st.session_state.perfil = None
+        st.session_state.registro_demandado = None
+        st.rerun()
+
     st.title("Zona del Demandado / Deudor")
 
-    st.markdown(
-        """
-        <div class="status-box">
-            Introduce el código de la reclamación para consultar el resumen
-            y seleccionar una actuación.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    registro_precargado = st.session_state.get("registro_demandado")
+
+    if registro_precargado:
+        st.markdown(
+            f"""
+            <div class="debt-alert">
+                Se ha detectado una deuda pendiente asociada a tu nombre.
+                <br>
+                Código de deuda: <b>{registro_precargado.get('codigo', '')}</b>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    codigo_default = registro_precargado.get("codigo", "") if registro_precargado else ""
 
     codigo = st.text_input(
         "Código de demanda",
+        value=codigo_default,
         placeholder="Ejemplo: MON-2026-ABC123"
     )
 
@@ -1099,8 +1291,7 @@ def pantalla_demandado():
             st.text_area("Borrador generado", borrador, height=300)
 
     with col2:
-        abrir_oposicion = st.button("Oponerse al pago", use_container_width=True)
-        if abrir_oposicion:
+        if st.button("Oponerse al pago", use_container_width=True):
             st.session_state.mostrar_oposicion = True
 
     with col3:
@@ -1144,6 +1335,7 @@ def pantalla_demandado():
 
         if enviar:
             motivo_final = motivo
+
             if reconoce_parte:
                 motivo_final += f"\nCantidad reconocida: {cantidad_reconocida}"
 
@@ -1166,29 +1358,6 @@ def pantalla_demandado():
 
 
 # ============================================================
-# DASHBOARD
-# ============================================================
-
-def pantalla_dashboard():
-    st.title("Panel de seguimiento")
-
-    df = cargar_registros()
-
-    if df.empty:
-        st.info("Todavía no hay expedientes registrados.")
-        return
-
-    st.dataframe(df, use_container_width=True, hide_index=True)
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    c1.metric("Total expedientes", len(df))
-    c2.metric("Pendientes", int((df["estado"] == "Pendiente de respuesta del deudor").sum()))
-    c3.metric("Pagados", int((df["estado"] == "Pagado").sum()))
-    c4.metric("Oposiciones", int((df["estado"] == "Oposición presentada").sum()))
-
-
-# ============================================================
 # EJECUCIÓN PRINCIPAL
 # ============================================================
 
@@ -1196,28 +1365,9 @@ if not st.session_state.autenticado:
     pantalla_login()
     st.stop()
 
-with st.sidebar:
-    st.title("LexMonitor AI")
-
-    if st.button("Cambiar perfil", use_container_width=True):
-        st.session_state.perfil = None
-        st.rerun()
-
-    if st.button("Cerrar sesión", use_container_width=True):
-        st.session_state.autenticado = False
-        st.session_state.perfil = None
-        st.rerun()
-
-    st.divider()
-
-    ver_dashboard = st.checkbox("Mostrar panel de seguimiento")
-
 if st.session_state.perfil is None:
+    topbar()
     pantalla_perfiles()
-    st.stop()
-
-if ver_dashboard:
-    pantalla_dashboard()
     st.stop()
 
 if st.session_state.perfil == "demandante":
