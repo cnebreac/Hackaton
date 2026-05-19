@@ -268,6 +268,53 @@ st.markdown(
         margin-bottom: 1.2rem;
     }
 
+    .compact-claim-card {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin-top: 0.8rem;
+    margin-bottom: 1.2rem;
+    }
+    
+    .compact-claim-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.8rem;
+        margin-bottom: 0.9rem;
+    }
+    
+    .compact-claim-item {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        padding: 0.65rem 0.8rem;
+    }
+    
+    .compact-claim-label {
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: #6b7280;
+        text-transform: uppercase;
+        margin-bottom: 0.2rem;
+    }
+    
+    .compact-claim-value {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #111827;
+    }
+    
+    .compact-claim-row {
+        font-size: 0.9rem;
+        color: #1f2937;
+        margin-bottom: 0.45rem;
+    }
+    
+    .compact-claim-row b {
+        color: #111827;
+    }
+
     .summary-row {
         margin-bottom: 0.55rem;
         color: #1f2937;
@@ -1257,21 +1304,44 @@ def pantalla_demandado():
         st.error("No se ha encontrado ninguna reclamación asociada a esta sesión.")
         return
 
-    st.markdown('<div class="form-section-title">Resumen de la reclamación</div>', unsafe_allow_html=True)
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Código", registro.get("codigo", ""))
-    c2.metric("Estado", registro.get("estado", ""))
-    c3.metric("Cantidad reclamada", f"{registro.get('cuantia', '')} €")
-
+    st.markdown(
+    '<div class="form-section-title">Resumen de la reclamación</div>',
+    unsafe_allow_html=True
+    )
+    
     st.markdown(
         f"""
-        <div class="panel">
-            <b>Demandante / acreedor:</b> {registro.get('demandante', '')}<br>
-            <b>Demandado / deudor:</b> {registro.get('demandado', '')}<br>
-            <b>Concepto de la deuda:</b> {registro.get('concepto_deuda', '')}<br>
-            <b>Documentación aportada:</b> {registro.get('categoria_art_812', '')}<br>
-            <b>Actuación recomendada actual:</b> {registro.get('accion_recomendada', '')}
+        <div class="compact-claim-card">
+            <div class="compact-claim-grid">
+                <div class="compact-claim-item">
+                    <div class="compact-claim-label">Código</div>
+                    <div class="compact-claim-value">{registro.get("codigo", "")}</div>
+                </div>
+                <div class="compact-claim-item">
+                    <div class="compact-claim-label">Estado</div>
+                    <div class="compact-claim-value">{registro.get("estado", "")}</div>
+                </div>
+                <div class="compact-claim-item">
+                    <div class="compact-claim-label">Cantidad reclamada</div>
+                    <div class="compact-claim-value">{registro.get("cuantia", "")} €</div>
+                </div>
+            </div>
+    
+            <div class="compact-claim-row">
+                <b>Demandante / acreedor:</b> {registro.get("demandante", "")}
+            </div>
+            <div class="compact-claim-row">
+                <b>Demandado / deudor:</b> {registro.get("demandado", "")}
+            </div>
+            <div class="compact-claim-row">
+                <b>Concepto de la deuda:</b> {registro.get("concepto_deuda", "")}
+            </div>
+            <div class="compact-claim-row">
+                <b>Documentación aportada:</b> {registro.get("categoria_art_812", "")}
+            </div>
+            <div class="compact-claim-row">
+                <b>Actuación recomendada actual:</b> {registro.get("accion_recomendada", "")}
+            </div>
         </div>
         """,
         unsafe_allow_html=True
