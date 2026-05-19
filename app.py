@@ -71,7 +71,7 @@ st.markdown(
     }
 
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 1.2rem;
         padding-left: 3rem;
         padding-right: 3rem;
         max-width: 1280px;
@@ -84,14 +84,14 @@ st.markdown(
     .institutional-header {
         background: #003366;
         color: white;
-        padding: 1.1rem 1.5rem;
+        padding: 1.15rem 1.5rem;
         border-bottom: 5px solid #f2c94c;
-        margin-bottom: 1rem;
+        margin-bottom: 1.2rem;
     }
 
     .institutional-title {
         color: white;
-        font-size: 1.15rem;
+        font-size: 1.25rem;
         font-weight: 800;
         margin-bottom: 0.2rem;
     }
@@ -277,6 +277,31 @@ st.markdown(
     label {
         color: #111827 !important;
         font-weight: 600 !important;
+    }
+
+    .logout-fixed {
+        position: fixed;
+        right: 1.4rem;
+        bottom: 1.2rem;
+        z-index: 9999;
+        width: 135px;
+    }
+
+    .logout-fixed div.stButton > button {
+        font-size: 0.76rem;
+        padding: 0.35rem 0.55rem;
+        min-height: 32px;
+        border-radius: 3px;
+        background-color: white;
+        color: #003366;
+        border: 1px solid #003366;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.14);
+    }
+
+    .logout-fixed div.stButton > button:hover {
+        background-color: #eef2f7;
+        color: #00264d;
+        border: 1px solid #00264d;
     }
     </style>
     """,
@@ -854,33 +879,33 @@ def pantalla_login():
 
 
 # ============================================================
-# CABECERA
+# CABECERA Y CIERRE DE SESIÓN
 # ============================================================
 
 def topbar():
-    col1, col2 = st.columns([6, 2])
+    st.markdown(
+        f"""
+        <div class="institutional-header">
+            <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
+            <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    with col1:
-        st.markdown(
-            f"""
-            <div class="institutional-header">
-                <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
-                <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 
-    with col2:
-        st.write("")
-        st.write("")
-        if st.button("Cerrar sesión", use_container_width=True, key="btn_cerrar_sesion"):
-            st.session_state.autenticado = False
-            st.session_state.perfil = None
-            st.session_state.usuario_nombre = ""
-            st.session_state.registro_demandado = None
-            st.session_state.mostrar_oposicion = False
-            st.rerun()
+def boton_cerrar_sesion_fijo():
+    st.markdown('<div class="logout-fixed">', unsafe_allow_html=True)
+
+    if st.button("Cerrar sesión", key="btn_cerrar_sesion_fijo"):
+        st.session_state.autenticado = False
+        st.session_state.perfil = None
+        st.session_state.usuario_nombre = ""
+        st.session_state.registro_demandado = None
+        st.session_state.mostrar_oposicion = False
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1369,6 +1394,8 @@ def pantalla_demandado():
 if not st.session_state.autenticado:
     pantalla_login()
     st.stop()
+
+boton_cerrar_sesion_fijo()
 
 if st.session_state.perfil is None:
     topbar()
