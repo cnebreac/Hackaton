@@ -751,7 +751,45 @@ def categorias_detectadas_texto(documentos_art_812):
 
     return "; ".join(categorias)
 
+def valor_limpio(valor):
+    if valor is None:
+        return ""
+    valor = str(valor).strip()
+    if valor.lower() in ["nan", "none", "nat"]:
+        return ""
+    return valor
 
+
+def limpiar_nombre_extraido(valor):
+    valor = valor_limpio(valor)
+    valor = re.sub(r"\s+", " ", valor).strip()
+
+    valor = re.sub(r"^/ acreedor\s*", "", valor, flags=re.IGNORECASE)
+    valor = re.sub(r"^/ deudor\s*", "", valor, flags=re.IGNORECASE)
+    valor = re.sub(r"^demandante\s*/\s*acreedor\s*", "", valor, flags=re.IGNORECASE)
+    valor = re.sub(r"^demandado\s*/\s*deudor\s*", "", valor, flags=re.IGNORECASE)
+
+    cortes = [
+        "Procedimiento solicitado",
+        "Proceso monitorio",
+        "Cuantía reclamada",
+        "Cuantia reclamada",
+        "Concepto de la deuda",
+        "Documentación",
+        "Documentacion",
+        "con DNI",
+        "con DNI/NIF",
+        "domiciliado",
+        "domiciliada",
+    ]
+
+    for corte in cortes:
+        pos = valor.lower().find(corte.lower())
+        if pos != -1:
+            valor = valor[:pos].strip()
+
+    return valor.strip(" ,.-")
+    
 def extraer_datos_demanda(texto_demanda, texto_documentos):
     texto_total = f"{texto_demanda}\n\n{texto_documentos}"
     texto_unido = re.sub(r"\s+", " ", texto_total).strip()
@@ -760,27 +798,22 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
     demandante = buscar_patron(
         texto_unido,
         [
+            r"Demandante\s*/\s*acreedor\s+(.+?)(?:Demandado\s*/\s*deudor|Procedimiento solicitado|Cuant[ií]a reclamada|Concepto de la deuda|$)",
             r"Don/Doña\s+(.+?),\s*actuando en nombre propio",
-            r"Don/Doña\s+(.+?),\s*\(en caso de actuar",
             r"Don/Doña\s+(.+?),\s*como representante",
+            r"Don/Doña\s+(.+?),\s*\(en caso de actuar",
             r"representante de la entidad\s+(.+?),\s*con DNI",
             r"representante de la entidad\s+(.+?),\s*con NIF",
         ]
     )
 
-    # Si el demandante viene en blanco pero firma al final, se intenta coger la firma
-    if not demandante:
-        demandante = buscar_patron(
-            texto_unido,
-            [
-                r"Firma:\s*(.+)$",
-            ]
-        )
+    demandante = limpiar_nombre_extraido(demandante)
 
     # DEMANDADO / DEUDOR
     demandado = buscar_patron(
         texto_unido,
         [
+            r"Demandado\s*/\s*deudor\s+(.+?)(?:Procedimiento solicitado|Proceso monitorio|Cuant[ií]a reclamada|Concepto de la deuda|Documentaci[oó]n|$)",
             r"contra:\s*Don/Doña\s+(.+?),\s*con DNI/NIF",
             r"contra:\s*Don/Doña\s+(.+?),\s*con DNI",
             r"contra:\s*Don/Doña\s+(.+?),\s*con NIF",
@@ -790,15 +823,18 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
         ]
     )
 
+    demandado = limpiar_nombre_extraido(demandado)
+
     # CUANTÍA
     cuantia_txt = buscar_patron(
         texto_unido,
         [
-            r"EN RECLAMACIÓN DE.*?\(([\d\.,]+)\s*€\)",
+            r"Cuant[ií]a reclamada\s+.*?\(([\d\.,]+)\s*€\)",
+            r"Cuant[ií]a reclamada\s+([\d\.,]+)\s*€",
+            r"EN RECLAMACI[ÓO]N DE.*?\(([\d\.,]+)\s*€\)",
             r"pague la cantidad de.*?\(([\d\.,]+)\s*€\)",
             r"pague/n la cantidad de.*?\(([\d\.,]+)\s*€\)",
             r"por importe total de\s+([\d\.,]+)\s*€",
-            r"EN RECLAMACIÓN DE\s+([\d\.,]+)\s*€",
         ]
     )
 
@@ -808,19 +844,15 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
     concepto_deuda = buscar_patron(
         texto_unido,
         [
+            r"Concepto de la deuda\s+(.+?)(?:Documentaci[oó]n|En atención a lo expuesto|PIDO AL JUZGADO|$)",
             r"La cantidad reclamada tiene origen en las relaciones mantenidas entre las partes y, concretamente:\s*(.+?)\s+En atención a lo expuesto",
             r"La cantidad reclamada tiene origen.*?concretamente:\s*(.+?)\s+En atención a lo expuesto",
             r"concretamente:\s*(.+?)\s+En atención a lo expuesto",
         ]
     )
 
-    # Limpieza del concepto para que no quede larguísimo
-    concepto_deuda = concepto_deuda.strip()
-    concepto_deuda = re.sub(r"\s+", " ", concepto_deuda)
-
-    # DOCUMENTOS: aquí NO analizamos contenido, porque tú querías validar solo por número.
-    hay_documento_deuda = False
-    documentos_art_812 = {}
+    concepto_deuda = valor_limpio(concepto_deuda)
+    concepto_deuda = re.sub(r"\s+", " ", concepto_deuda).strip()
 
     datos_faltantes = []
 
@@ -838,8 +870,8 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
         "demandado": demandado,
         "cuantia": cuantia,
         "concepto_deuda": concepto_deuda,
-        "hay_documento_deuda": hay_documento_deuda,
-        "documentos_art_812": documentos_art_812,
+        "hay_documento_deuda": False,
+        "documentos_art_812": {},
         "categoria_art_812": "",
         "datos_faltantes": datos_faltantes,
         "cumple_requisitos_auto": len(datos_faltantes) == 0,
