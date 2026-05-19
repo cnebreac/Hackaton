@@ -1279,6 +1279,14 @@ def pantalla_demandante():
 # DEMANDADO
 # ============================================================
 
+def valor_limpio(valor):
+    if valor is None:
+        return ""
+    valor = str(valor)
+    if valor.lower() in ["nan", "none", "nat"]:
+        return ""
+    return valor.strip()
+    
 def pantalla_demandado():
     topbar()
 
@@ -1296,9 +1304,24 @@ def pantalla_demandado():
         return
 
     st.markdown(
-    '<div class="form-section-title">Resumen de la reclamación</div>',
-    unsafe_allow_html=True
+        '<div class="form-section-title">Resumen de la reclamación</div>',
+        unsafe_allow_html=True
     )
+    
+    codigo = valor_limpio(registro.get("codigo", ""))
+    estado = valor_limpio(registro.get("estado", ""))
+    cuantia = valor_limpio(registro.get("cuantia", ""))
+    demandante = valor_limpio(registro.get("demandante", ""))
+    demandado = valor_limpio(registro.get("demandado", ""))
+    concepto = valor_limpio(registro.get("concepto_deuda", ""))
+    documentacion = valor_limpio(registro.get("categoria_art_812", ""))
+    accion = valor_limpio(registro.get("accion_recomendada", ""))
+    
+    if not documentacion:
+        documentacion = "Documentación acreditativa aportada"
+    
+    if not accion:
+        accion = "Pendiente de actuación"
     
     st.markdown(
         f"""
@@ -1306,39 +1329,37 @@ def pantalla_demandado():
             <div class="compact-claim-grid">
                 <div class="compact-claim-item">
                     <div class="compact-claim-label">Código</div>
-                    <div class="compact-claim-value">{registro.get("codigo", "")}</div>
+                    <div class="compact-claim-value">{codigo}</div>
                 </div>
                 <div class="compact-claim-item">
                     <div class="compact-claim-label">Estado</div>
-                    <div class="compact-claim-value">{registro.get("estado", "")}</div>
+                    <div class="compact-claim-value">{estado}</div>
                 </div>
                 <div class="compact-claim-item">
                     <div class="compact-claim-label">Cantidad reclamada</div>
-                    <div class="compact-claim-value">{registro.get("cuantia", "")} €</div>
+                    <div class="compact-claim-value">{cuantia} €</div>
                 </div>
             </div>
     
             <div class="compact-claim-row">
-                <b>Demandante / acreedor:</b> {registro.get("demandante", "")}
+                <b>Demandante / acreedor:</b> {demandante}
             </div>
             <div class="compact-claim-row">
-                <b>Demandado / deudor:</b> {registro.get("demandado", "")}
+                <b>Demandado / deudor:</b> {demandado}
             </div>
             <div class="compact-claim-row">
-                <b>Concepto de la deuda:</b> {registro.get("concepto_deuda", "")}
+                <b>Concepto de la deuda:</b> {concepto}
             </div>
             <div class="compact-claim-row">
-                <b>Documentación aportada:</b> {registro.get("categoria_art_812", "")}
+                <b>Documentación aportada:</b> {documentacion}
             </div>
             <div class="compact-claim-row">
-                <b>Actuación recomendada actual:</b> {registro.get("accion_recomendada", "")}
+                <b>Actuación recomendada actual:</b> {accion}
             </div>
         </div>
         """,
         unsafe_allow_html=True
     )
-
-    st.markdown('<div class="form-section-title">Selecciona una actuación</div>', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
 
