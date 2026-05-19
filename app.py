@@ -71,10 +71,10 @@ st.markdown(
     }
 
     .block-container {
-        padding-top: 0.5rem;
-        padding-left: 3rem;
-        padding-right: 3rem;
-        max-width: 1200px;
+        padding-top: 0.8rem;
+        padding-left: 2.5rem;
+        padding-right: 2.5rem;
+        max-width: 1280px;
     }
 
     .main {
@@ -85,7 +85,7 @@ st.markdown(
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.8rem;
     }
 
     .topbar-title {
@@ -95,7 +95,7 @@ st.markdown(
     }
 
     .topbar-user {
-        font-size: 0.9rem;
+        font-size: 0.95rem;
         color: #6b7280;
     }
 
@@ -148,75 +148,58 @@ st.markdown(
         margin-bottom: 1.5rem;
     }
 
-    .blank-selection {
-        min-height: auto;
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding-top: 0.5rem;
-    }
-
-    .selection-card {
-        background: white;
-        border-radius: 30px;
-        padding: 2rem 2.5rem;
-        width: 100%;
-        max-width: 900px;
-        box-shadow: 0 20px 55px rgba(15, 23, 42, 0.10);
-        border: 1px solid #e5e7eb;
-        margin-top: 0;
-    }
-
     .selection-title {
         text-align: center;
-        font-size: 1.7rem;
+        font-size: 2rem;
         font-weight: 850;
         color: #111827;
-        margin-bottom: 0.4rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.45rem;
     }
 
     .selection-subtitle {
         text-align: center;
         color: #6b7280;
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
+        font-size: 1rem;
     }
 
     .role-card {
-        padding: 1.7rem;
+        padding: 2.2rem 1.8rem;
         border-radius: 24px;
         background: #ffffff;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+        border: 1px solid #dbe3ef;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
         text-align: center;
-        min-height: 205px;
-        margin-bottom: 1rem;
-    }
-
-    .role-card-debt {
-        padding: 1.7rem;
-        border-radius: 24px;
-        background: #fff7ed;
-        border: 2px solid #f97316;
-        box-shadow: 0 18px 45px rgba(249, 115, 22, 0.22);
-        text-align: center;
-        min-height: 205px;
-        margin-bottom: 1rem;
-    }
-
-    .role-icon {
-        font-size: 2.4rem;
+        min-height: 215px;
         margin-bottom: 0.8rem;
     }
 
+    .role-card-debt {
+        padding: 2.2rem 1.8rem;
+        border-radius: 24px;
+        background: #fff7ed;
+        border: 2px solid #f97316;
+        box-shadow: 0 16px 40px rgba(249, 115, 22, 0.16);
+        text-align: center;
+        min-height: 215px;
+        margin-bottom: 0.8rem;
+    }
+
+    .role-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.85rem;
+    }
+
     .role-title {
-        font-size: 1.45rem;
+        font-size: 1.5rem;
         font-weight: 850;
         color: #111827;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.6rem;
     }
 
     .role-text {
-        font-size: 0.98rem;
+        font-size: 1rem;
         color: #6b7280;
         line-height: 1.5;
     }
@@ -227,9 +210,10 @@ st.markdown(
         border-left: 6px solid #f97316;
         border-radius: 18px;
         padding: 1rem 1.3rem;
-        margin-bottom: 1.3rem;
+        margin: 0 auto 1.8rem auto;
         color: #7c2d12;
         font-weight: 650;
+        max-width: 980px;
     }
 
     .panel {
@@ -268,7 +252,8 @@ st.markdown(
     div.stButton > button {
         border-radius: 13px;
         font-weight: 750;
-        padding: 0.72rem 1rem;
+        padding: 0.78rem 1rem;
+        min-height: 48px;
     }
 
     div[data-testid="stFileUploader"] {
@@ -856,7 +841,7 @@ def pantalla_login():
 # ============================================================
 
 def topbar():
-    col1, col2 = st.columns([8, 1.4])
+    col1, col2 = st.columns([8, 1.5])
 
     with col1:
         st.markdown(
@@ -889,9 +874,6 @@ def pantalla_perfiles():
     deudas = buscar_deudas_por_nombre(st.session_state.usuario_nombre)
     tiene_deudas = not deudas.empty
 
-    st.markdown('<div class="blank-selection">', unsafe_allow_html=True)
-    st.markdown('<div class="selection-card">', unsafe_allow_html=True)
-
     st.markdown(
         """
         <div class="selection-title">¿Cómo quieres acceder?</div>
@@ -914,7 +896,7 @@ def pantalla_perfiles():
             unsafe_allow_html=True
         )
 
-    col1, col2 = st.columns(2)
+    margen_izq, col1, col2, margen_der = st.columns([0.35, 1, 1, 0.35], gap="large")
 
     with col1:
         st.markdown(
@@ -930,7 +912,7 @@ def pantalla_perfiles():
             unsafe_allow_html=True
         )
 
-        if st.button("Entrar como Demandante", use_container_width=True):
+        if st.button("Entrar como Demandante", use_container_width=True, key="btn_demandante_home"):
             st.session_state.perfil = "demandante"
             st.rerun()
 
@@ -956,7 +938,7 @@ def pantalla_perfiles():
             unsafe_allow_html=True
         )
 
-        if st.button("Entrar como Demandado", use_container_width=True):
+        if st.button("Entrar como Demandado", use_container_width=True, key="btn_demandado_home"):
             st.session_state.perfil = "demandado"
 
             if tiene_deudas:
@@ -964,9 +946,6 @@ def pantalla_perfiles():
                 st.session_state.registro_demandado = primer_registro
 
             st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
