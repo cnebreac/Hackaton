@@ -85,10 +85,10 @@ st.markdown(
     .institutional-header {
         background: #003366;
         color: white;
-        padding: 1.35rem 1.7rem;
+        padding: 1.65rem 2rem;
         border-bottom: 5px solid #f2c94c;
-        margin-bottom: 1.6rem;
-        min-height: 95px;
+        margin-bottom: 1.8rem;
+        min-height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: center;
