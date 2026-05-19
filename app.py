@@ -81,18 +81,14 @@ st.markdown(
         background: #f3f4f6;
     }
 
-        .institutional-header {
+    /* CABECERA INSTITUCIONAL */
+    .institutional-header {
         background: #003366;
         color: white;
         padding: 1.15rem 1.5rem;
         border-bottom: 5px solid #f2c94c;
         margin-bottom: 1.2rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .institutional-header-left {
+        min-height: 92px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -110,24 +106,30 @@ st.markdown(
         font-size: 0.9rem;
     }
 
-    .logout-header-link {
-        display: inline-block;
-        font-size: 0.8rem;
-        padding: 0.38rem 0.75rem;
+    /* BOTÓN CERRAR SESIÓN JUNTO A LA CABECERA */
+    .logout-header-button {
+        padding-top: 1.15rem;
+    }
+
+    .logout-header-button div.stButton > button {
+        font-size: 0.76rem;
+        padding: 0.35rem 0.5rem;
+        min-height: 34px;
         border-radius: 3px;
-        background: rgba(255,255,255,0.12);
-        color: #eaf2ff !important;
-        border: 1px solid rgba(255,255,255,0.25);
-        text-decoration: none !important;
+        background-color: #f3f4f6;
+        color: #003366;
+        border: 1px solid #cbd5e1;
+        box-shadow: none;
         font-weight: 600;
     }
 
-    .logout-header-link:hover {
-        background: rgba(255,255,255,0.20);
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.38);
+    .logout-header-button div.stButton > button:hover {
+        background-color: #e5e7eb;
+        color: #00264d;
+        border: 1px solid #94a3b8;
     }
 
+    /* LOGIN */
     .login-wrapper {
         max-width: 520px;
         margin: 4rem auto 1.2rem auto;
@@ -170,6 +172,7 @@ st.markdown(
         margin-bottom: 0;
     }
 
+    /* PANTALLA PRINCIPAL */
     .home-spacer {
         height: 4.5rem;
     }
@@ -238,6 +241,7 @@ st.markdown(
         max-width: 980px;
     }
 
+    /* PANELES */
     .panel {
         background: white;
         border-radius: 4px;
@@ -274,6 +278,7 @@ st.markdown(
         color: #78350f;
     }
 
+    /* BOTONES GENERALES */
     div.stButton > button {
         border-radius: 3px;
         font-weight: 700;
@@ -290,6 +295,7 @@ st.markdown(
         border: 1px solid #00264d;
     }
 
+    /* SUBIDA DE ARCHIVOS */
     div[data-testid="stFileUploader"] {
         background: #ffffff;
         border: 1px solid #cbd5e1;
@@ -305,12 +311,10 @@ st.markdown(
         color: #111827 !important;
         font-weight: 600 !important;
     }
-
     </style>
     """,
     unsafe_allow_html=True
 )
-
 
 # ============================================================
 # ESTADO DE SESIÓN
@@ -899,23 +903,21 @@ def pantalla_login():
 # ============================================================
 
 def topbar():
-    col1, col2 = st.columns([8, 1.4], vertical_alignment="center")
+    col1, col2 = st.columns([8, 1.3])
 
     with col1:
         st.markdown(
             f"""
             <div class="institutional-header">
-                <div class="institutional-header-left">
-                    <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
-                    <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
-                </div>
+                <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
+                <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
     with col2:
-        st.markdown('<div class="logout-soft">', unsafe_allow_html=True)
+        st.markdown('<div class="logout-header-button">', unsafe_allow_html=True)
 
         if st.button("Cerrar sesión", key="btn_cerrar_sesion_header", use_container_width=True):
             st.session_state.autenticado = False
