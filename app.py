@@ -982,7 +982,7 @@ def pantalla_perfiles():
         st.markdown(
             f"""
             <div class="debt-alert">
-                Tienes una deuda pendiente asociada a tu nombre.
+                Se ha detectado una deuda pendiente asociada a tu nombre.
                 <br>
                 Código de deuda: <b>{codigos}</b>
             </div>
@@ -1014,7 +1014,7 @@ def pantalla_perfiles():
         clase = "role-card-debt" if tiene_deudas else "role-card"
 
         texto = (
-            "Tienes una reclamación pendiente. Consulta el expediente y selecciona una actuación."
+            "Existe una reclamación pendiente asociada a tu nombre. Puedes acceder para consultar el expediente y seleccionar una actuación."
             if tiene_deudas
             else "Consultar una reclamación mediante código y responder a la solicitud recibida."
         )
@@ -1039,7 +1039,6 @@ def pantalla_perfiles():
                 st.session_state.registro_demandado = primer_registro
 
             st.rerun()
-
 
 # ============================================================
 # DEMANDANTE
