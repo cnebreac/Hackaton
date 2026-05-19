@@ -37,6 +37,7 @@ st.set_page_config(
 
 CSV_LOCAL = "expedientes_lexmonitor.csv"
 MIN_DOCUMENTOS_ACREDITATIVOS = 1
+CODIGO_DEUDA_DEMO = "MON-2026-886941"
 
 HEADERS = [
     "codigo",
@@ -82,7 +83,6 @@ st.markdown(
         background: #f3f4f6;
     }
 
-    /* CABECERA INSTITUCIONAL */
     .institutional-header {
         background: #003366;
         color: white;
@@ -109,7 +109,6 @@ st.markdown(
         font-size: 0.92rem;
     }
 
-    /* BOTÓN CERRAR SESIÓN AL FINAL */
     .logout-bottom-container {
         display: flex;
         justify-content: flex-end;
@@ -135,7 +134,6 @@ st.markdown(
         border: 1px solid #003366;
     }
 
-    /* LOGIN */
     .login-wrapper {
         max-width: 520px;
         margin: 4rem auto 1.2rem auto;
@@ -178,7 +176,6 @@ st.markdown(
         margin-bottom: 0;
     }
 
-    /* PANTALLA PRINCIPAL */
     .home-spacer {
         height: 3.8rem;
     }
@@ -247,7 +244,6 @@ st.markdown(
         max-width: 980px;
     }
 
-    /* PÁGINAS DE FORMULARIO */
     .form-page-title {
         font-size: 1.55rem;
         font-weight: 800;
@@ -283,7 +279,6 @@ st.markdown(
         color: #111827;
     }
 
-    /* PANELES */
     .panel {
         background: white;
         border-radius: 4px;
@@ -291,15 +286,6 @@ st.markdown(
         border: 1px solid #cbd5e1;
         box-shadow: none;
         margin-bottom: 1.2rem;
-    }
-
-    .status-box {
-        background: #eef2f7;
-        border-left: 5px solid #003366;
-        padding: 1rem 1.2rem;
-        border-radius: 4px;
-        margin-bottom: 1rem;
-        color: #1f2937;
     }
 
     .success-box {
@@ -320,7 +306,6 @@ st.markdown(
         color: #78350f;
     }
 
-    /* BOTONES GENERALES */
     div.stButton > button {
         border-radius: 3px;
         font-weight: 700;
@@ -337,7 +322,6 @@ st.markdown(
         border: 1px solid #00264d;
     }
 
-    /* SUBIDA DE ARCHIVOS */
     div[data-testid="stFileUploader"] {
         background: #ffffff;
         border: 1px solid #cbd5e1;
@@ -522,19 +506,29 @@ def buscar_deudas_por_nombre(nombre):
 
     nombre_norm = normalizar_texto(nombre)
 
-    estados_pendientes = [
-        "pendiente de respuesta del deudor",
-        "pendiente de subsanación",
-        "sin pago ni oposición"
+    estados_cerrados = [
+        "pagado",
+        "oposicion presentada",
+        "oposición presentada",
+        "archivado",
+        "finalizado",
+        "cerrado"
     ]
 
     df["demandado_norm"] = df["demandado"].apply(normalizar_texto)
     df["estado_norm"] = df["estado"].apply(normalizar_texto)
 
-    coincidencias = df[
+    coincidencia_nombre = (
         (df["demandado_norm"] == nombre_norm)
-        & (df["estado_norm"].isin(estados_pendientes))
-    ].copy()
+        |
+        (df["demandado_norm"].str.contains(nombre_norm, na=False))
+        |
+        (df["demandado_norm"].apply(lambda x: nombre_norm in x if isinstance(x, str) else False))
+    )
+
+    estado_pendiente = ~df["estado_norm"].isin([normalizar_texto(e) for e in estados_cerrados])
+
+    coincidencias = df[coincidencia_nombre & estado_pendiente].copy()
 
     coincidencias = coincidencias.drop(
         columns=["demandado_norm", "estado_norm"],
@@ -818,21 +812,6 @@ Documento generado automáticamente para revisión humana.
 """.strip()
 
 
-def generar_borrador_subsanacion(registro):
-    return f"""
-AUTO DE REQUERIMIENTO DE SUBSANACIÓN
-
-Código de expediente: {registro['codigo']}
-
-Examinada la solicitud presentada por {registro['demandante']} frente a {registro['demandado']}, se aprecia que no constan todos los elementos necesarios para su admisión inicial.
-
-Actuación recomendada:
-{registro['accion_recomendada']}
-
-Documento generado automáticamente para revisión humana.
-""".strip()
-
-
 def generar_borrador_pago(registro):
     return f"""
 DILIGENCIA DE PAGO Y ARCHIVO
@@ -964,6 +943,13 @@ def boton_cerrar_sesion_final():
 
 def pantalla_perfiles():
     deudas = buscar_deudas_por_nombre(st.session_state.usuario_nombre)
+
+    if deudas.empty:
+        registro_demo = buscar_por_codigo(CODIGO_DEUDA_DEMO)
+
+        if registro_demo is not None:
+            deudas = pd.DataFrame([registro_demo])
+
     tiene_deudas = not deudas.empty
 
     st.markdown('<div class="home-spacer"></div>', unsafe_allow_html=True)
@@ -976,7 +962,6 @@ def pantalla_perfiles():
         unsafe_allow_html=True
     )
 
-    # MENSAJE DE DEUDA EN LA SEGUNDA VENTANA
     if tiene_deudas:
         codigos = ", ".join(deudas["codigo"].astype(str).tolist())
 
@@ -991,8 +976,7 @@ def pantalla_perfiles():
             unsafe_allow_html=True
         )
 
-        primer_registro = deudas.iloc[0].to_dict()
-        st.session_state.registro_demandado = primer_registro
+        st.session_state.registro_demandado = deudas.iloc[0].to_dict()
 
     margen_izq, col1, col2, margen_der = st.columns([0.35, 1, 1, 0.35], gap="large")
 
@@ -1039,10 +1023,10 @@ def pantalla_perfiles():
             st.session_state.perfil = "demandado"
 
             if tiene_deudas:
-                primer_registro = deudas.iloc[0].to_dict()
-                st.session_state.registro_demandado = primer_registro
+                st.session_state.registro_demandado = deudas.iloc[0].to_dict()
 
             st.rerun()
+
 
 # ============================================================
 # DEMANDANTE
@@ -1055,12 +1039,7 @@ def pantalla_demandante():
         st.session_state.perfil = None
         st.rerun()
 
-    st.markdown(
-        """
-        <div class="form-page-title">Zona del Demandante / Acreedor</div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="form-page-title">Zona del Demandante / Acreedor</div>', unsafe_allow_html=True)
 
     modo = st.radio(
         "Elige cómo quieres presentar la solicitud",
@@ -1080,12 +1059,7 @@ def pantalla_demandante():
         "concepto_deuda": ""
     }
 
-    st.markdown(
-        """
-        <div class="form-section-title">Solicitud monitoria</div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="form-section-title">Solicitud monitoria</div>', unsafe_allow_html=True)
 
     if modo == "Subir PDF/DOCX/TXT de plantilla rellena":
         demanda_file = st.file_uploader(
@@ -1129,12 +1103,7 @@ def pantalla_demandante():
         Solicito la tramitación de proceso monitorio.
         """
 
-    st.markdown(
-        """
-        <div class="form-section-title">Documentos acreditativos</div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="form-section-title">Documentos acreditativos</div>', unsafe_allow_html=True)
 
     documentos_files = st.file_uploader(
         f"Sube los documentos acreditativos necesarios. Mínimo requerido: {MIN_DOCUMENTOS_ACREDITATIVOS}",
@@ -1152,11 +1121,8 @@ def pantalla_demandante():
             "demandado": datos_manual["demandado"],
             "cuantia": datos_manual["cuantia"],
             "concepto_deuda": datos_manual["concepto_deuda"],
-            "hay_documento_deuda": documentos_validos,
-            "documentos_art_812": {},
             "categoria_art_812": f"{numero_documentos} documento(s) acreditativo(s) aportado(s)",
-            "datos_faltantes": [],
-            "cumple_requisitos_auto": False
+            "datos_faltantes": []
         }
 
         if not datos_extraidos["demandante"]:
@@ -1176,10 +1142,6 @@ def pantalla_demandante():
     else:
         datos_extraidos = extraer_datos_demanda(texto_demanda, "")
 
-        datos_extraidos["hay_documento_deuda"] = documentos_validos
-        datos_extraidos["documentos_art_812"] = {}
-        datos_extraidos["categoria_art_812"] = f"{numero_documentos} documento(s) acreditativo(s) aportado(s)"
-
         datos_faltantes = []
 
         if not datos_extraidos["demandante"]:
@@ -1195,42 +1157,20 @@ def pantalla_demandante():
             datos_faltantes.append("Documentos acreditativos suficientes")
 
         datos_extraidos["datos_faltantes"] = datos_faltantes
+        datos_extraidos["categoria_art_812"] = f"{numero_documentos} documento(s) acreditativo(s) aportado(s)"
         datos_extraidos["cumple_requisitos_auto"] = len(datos_faltantes) == 0
 
-    st.markdown(
-        """
-        <div class="form-section-title">Resumen de la demanda</div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="form-section-title">Resumen de la demanda</div>', unsafe_allow_html=True)
 
     st.markdown(
         f"""
         <div class="summary-card">
-            <div class="summary-row">
-                <span class="summary-label">Demandante / acreedor:</span>
-                {datos_extraidos["demandante"] or "No detectado"}
-            </div>
-            <div class="summary-row">
-                <span class="summary-label">Demandado / deudor:</span>
-                {datos_extraidos["demandado"] or "No detectado"}
-            </div>
-            <div class="summary-row">
-                <span class="summary-label">Cuantía reclamada:</span>
-                {float(datos_extraidos["cuantia"]):,.2f} €
-            </div>
-            <div class="summary-row">
-                <span class="summary-label">Concepto de la deuda:</span>
-                {datos_extraidos.get("concepto_deuda", "") or "No detectado"}
-            </div>
-            <div class="summary-row">
-                <span class="summary-label">Documentos acreditativos aportados:</span>
-                {numero_documentos}
-            </div>
-            <div class="summary-row">
-                <span class="summary-label">Mínimo requerido:</span>
-                {MIN_DOCUMENTOS_ACREDITATIVOS}
-            </div>
+            <div class="summary-row"><span class="summary-label">Demandante / acreedor:</span> {datos_extraidos["demandante"] or "No detectado"}</div>
+            <div class="summary-row"><span class="summary-label">Demandado / deudor:</span> {datos_extraidos["demandado"] or "No detectado"}</div>
+            <div class="summary-row"><span class="summary-label">Cuantía reclamada:</span> {float(datos_extraidos["cuantia"]):,.2f} €</div>
+            <div class="summary-row"><span class="summary-label">Concepto de la deuda:</span> {datos_extraidos.get("concepto_deuda", "") or "No detectado"}</div>
+            <div class="summary-row"><span class="summary-label">Documentos acreditativos aportados:</span> {numero_documentos}</div>
+            <div class="summary-row"><span class="summary-label">Mínimo requerido:</span> {MIN_DOCUMENTOS_ACREDITATIVOS}</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -1285,12 +1225,7 @@ def pantalla_demandante():
         else:
             st.info("Registro guardado en CSV local.")
 
-        st.markdown(
-            """
-            <div class="form-section-title">Borrador generado</div>
-            """,
-            unsafe_allow_html=True
-        )
+        st.markdown('<div class="form-section-title">Borrador generado</div>', unsafe_allow_html=True)
 
         st.text_area("Borrador", borrador, height=300)
 
@@ -1314,15 +1249,9 @@ def pantalla_demandado():
         st.session_state.registro_demandado = None
         st.rerun()
 
-    st.markdown(
-        """
-        <div class="form-page-title">Zona del Demandado / Deudor</div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="form-page-title">Zona del Demandado / Deudor</div>', unsafe_allow_html=True)
 
     registro_precargado = st.session_state.get("registro_demandado")
-
     codigo_default = registro_precargado.get("codigo", "") if registro_precargado else ""
 
     codigo = st.text_input(
@@ -1347,12 +1276,7 @@ def pantalla_demandado():
     if not registro:
         return
 
-    st.markdown(
-        """
-        <div class="form-section-title">Resumen de la reclamación</div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="form-section-title">Resumen de la reclamación</div>', unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Código", registro.get("codigo", ""))
@@ -1372,12 +1296,7 @@ def pantalla_demandado():
         unsafe_allow_html=True
     )
 
-    st.markdown(
-        """
-        <div class="form-section-title">Selecciona una actuación</div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown('<div class="form-section-title">Selecciona una actuación</div>', unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
 
@@ -1422,12 +1341,7 @@ def pantalla_demandado():
             st.text_area("Borrador generado", borrador, height=300)
 
     if st.session_state.get("mostrar_oposicion", False):
-        st.markdown(
-            """
-            <div class="form-section-title">Formulario de oposición</div>
-            """,
-            unsafe_allow_html=True
-        )
+        st.markdown('<div class="form-section-title">Formulario de oposición</div>', unsafe_allow_html=True)
 
         with st.form("form_oposicion"):
             motivo = st.text_area(
