@@ -754,61 +754,84 @@ def categorias_detectadas_texto(documentos_art_812):
 
 def extraer_datos_demanda(texto_demanda, texto_documentos):
     texto_total = f"{texto_demanda}\n\n{texto_documentos}"
-    texto_unido = re.sub(r"\s+", " ", texto_total)
+    texto_unido = re.sub(r"\s+", " ", texto_total).strip()
 
+    # DEMANDANTE / ACREEDOR
     demandante = buscar_patron(
         texto_unido,
         [
-            r"Don/Doña\s+(.+?)\s*,\s*\(en caso de actuar en representación",
-            r"representante de la entidad\s+(.+?)\s*,\s*con DNI",
+            r"Don/Doña\s+(.+?),\s*actuando en nombre propio",
+            r"Don/Doña\s+(.+?),\s*\(en caso de actuar",
+            r"Don/Doña\s+(.+?),\s*como representante",
+            r"representante de la entidad\s+(.+?),\s*con DNI",
+            r"representante de la entidad\s+(.+?),\s*con NIF",
         ]
     )
 
+    # Si el demandante viene en blanco pero firma al final, se intenta coger la firma
+    if not demandante:
+        demandante = buscar_patron(
+            texto_unido,
+            [
+                r"Firma:\s*(.+)$",
+            ]
+        )
+
+    # DEMANDADO / DEUDOR
     demandado = buscar_patron(
         texto_unido,
         [
-            r"contra:\s*Don/Doña\s+(.+?)\s+con DNI",
-            r"contra:\s*(.+?)\s+con DNI",
+            r"contra:\s*Don/Doña\s+(.+?),\s*con DNI/NIF",
+            r"contra:\s*Don/Doña\s+(.+?),\s*con DNI",
+            r"contra:\s*Don/Doña\s+(.+?),\s*con NIF",
+            r"contra:\s*(.+?),\s*con DNI/NIF",
+            r"contra:\s*(.+?),\s*con DNI",
+            r"contra:\s*(.+?),\s*con NIF",
         ]
     )
 
+    # CUANTÍA
     cuantia_txt = buscar_patron(
         texto_unido,
         [
-            r"EN RECLAMACIÓN DE\s+(.+?)\s+contra:",
-            r"pague/n la cantidad de\s+(.+?)(?:,|\.|y para el caso)",
+            r"EN RECLAMACIÓN DE.*?\(([\d\.,]+)\s*€\)",
+            r"pague la cantidad de.*?\(([\d\.,]+)\s*€\)",
+            r"pague/n la cantidad de.*?\(([\d\.,]+)\s*€\)",
+            r"por importe total de\s+([\d\.,]+)\s*€",
+            r"EN RECLAMACIÓN DE\s+([\d\.,]+)\s*€",
         ]
     )
 
     cuantia = limpiar_numero(cuantia_txt)
 
+    # CONCEPTO / HECHOS DE LA DEUDA
     concepto_deuda = buscar_patron(
-    texto_unido,
-    [
-        r"La cantidad reclamada tiene origen en las relaciones mantenidas entre las partes y, concretamente\s*[:\-]?\s*(.+?)\s+En atención a lo expuesto",
-        r"relate brevemente los hechos que han originado la deuda\s*\)?\s*[:\-]?\s*(.+?)\s+En atención a lo expuesto",
+        texto_unido,
+        [
+            r"La cantidad reclamada tiene origen en las relaciones mantenidas entre las partes y, concretamente:\s*(.+?)\s+En atención a lo expuesto",
+            r"La cantidad reclamada tiene origen.*?concretamente:\s*(.+?)\s+En atención a lo expuesto",
+            r"concretamente:\s*(.+?)\s+En atención a lo expuesto",
         ]
     )
 
-    hay_documento_deuda, documentos_art_812 = detectar_documentos_art_812(texto_documentos)
+    # Limpieza del concepto para que no quede larguísimo
+    concepto_deuda = concepto_deuda.strip()
+    concepto_deuda = re.sub(r"\s+", " ", concepto_deuda)
+
+    # DOCUMENTOS: aquí NO analizamos contenido, porque tú querías validar solo por número.
+    hay_documento_deuda = False
+    documentos_art_812 = {}
 
     datos_faltantes = []
 
     if not demandante:
         datos_faltantes.append("Demandante / acreedor")
+
     if not demandado:
         datos_faltantes.append("Demandado / deudor")
+
     if cuantia <= 0:
         datos_faltantes.append("Cuantía")
-    if not hay_documento_deuda:
-        datos_faltantes.append("Documentación acreditativa art. 812 LEC")
-
-    cumple_requisitos_auto = (
-        bool(demandante)
-        and bool(demandado)
-        and cuantia > 0
-        and hay_documento_deuda
-    )
 
     return {
         "demandante": demandante,
@@ -817,12 +840,10 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
         "concepto_deuda": concepto_deuda,
         "hay_documento_deuda": hay_documento_deuda,
         "documentos_art_812": documentos_art_812,
-        "categoria_art_812": categorias_detectadas_texto(documentos_art_812),
+        "categoria_art_812": "",
         "datos_faltantes": datos_faltantes,
-        "cumple_requisitos_auto": cumple_requisitos_auto,
+        "cumple_requisitos_auto": len(datos_faltantes) == 0,
     }
-
-
 # ============================================================
 # BORRADORES
 # ============================================================
