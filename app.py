@@ -1348,7 +1348,10 @@ def pantalla_demandado():
         st.session_state.registro_demandado = None
         st.rerun()
 
-    st.markdown('<div class="form-page-title">Zona del Demandado / Deudor</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="form-page-title">Zona del Demandado / Deudor</div>',
+        unsafe_allow_html=True
+    )
 
     registro = st.session_state.get("registro_demandado")
 
@@ -1356,11 +1359,6 @@ def pantalla_demandado():
         st.error("No se ha encontrado ninguna reclamación asociada a esta sesión.")
         return
 
-    st.markdown(
-        '<div class="form-section-title">Resumen de la reclamación</div>',
-        unsafe_allow_html=True
-    )
-    
     codigo = valor_limpio(registro.get("codigo", ""))
     estado = valor_limpio(registro.get("estado", ""))
     cuantia = valor_limpio(registro.get("cuantia", ""))
@@ -1369,48 +1367,48 @@ def pantalla_demandado():
     concepto = valor_limpio(registro.get("concepto_deuda", ""))
     documentacion = valor_limpio(registro.get("categoria_art_812", ""))
     accion = valor_limpio(registro.get("accion_recomendada", ""))
-    
+
     if not documentacion:
         documentacion = "Documentación acreditativa aportada"
-    
+
     if not accion:
         accion = "Pendiente de actuación"
-    
+
     st.markdown(
-        f"""
-        <div class="compact-claim-card">
-            <div class="compact-claim-grid">
-                <div class="compact-claim-item">
-                    <div class="compact-claim-label">Código</div>
-                    <div class="compact-claim-value">{codigo}</div>
-                </div>
-                <div class="compact-claim-item">
-                    <div class="compact-claim-label">Estado</div>
-                    <div class="compact-claim-value">{estado}</div>
-                </div>
-                <div class="compact-claim-item">
-                    <div class="compact-claim-label">Cantidad reclamada</div>
-                    <div class="compact-claim-value">{cuantia} €</div>
-                </div>
-            </div>
-    
-            <div class="compact-claim-row">
-                <b>Demandante / acreedor:</b> {demandante}
-            </div>
-            <div class="compact-claim-row">
-                <b>Demandado / deudor:</b> {demandado}
-            </div>
-            <div class="compact-claim-row">
-                <b>Concepto de la deuda:</b> {concepto}
-            </div>
-            <div class="compact-claim-row">
-                <b>Documentación aportada:</b> {documentacion}
-            </div>
-            <div class="compact-claim-row">
-                <b>Actuación recomendada actual:</b> {accion}
-            </div>
-        </div>
-        """,
+        '<div class="form-section-title">Resumen de la reclamación</div>',
+        unsafe_allow_html=True
+    )
+
+    with st.container(border=True):
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.caption("Código")
+            st.write(f"**{codigo}**")
+
+        with c2:
+            st.caption("Estado")
+            st.write(f"**{estado}**")
+
+        with c3:
+            st.caption("Cantidad reclamada")
+            st.write(f"**{cuantia} €**")
+
+        st.divider()
+
+        st.write(f"**Demandante / acreedor:** {demandante}")
+        st.write(f"**Demandado / deudor:** {demandado}")
+
+        if concepto:
+            st.write(f"**Concepto de la deuda:** {concepto}")
+        else:
+            st.write("**Concepto de la deuda:** No consta")
+
+        st.write(f"**Documentación aportada:** {documentacion}")
+        st.write(f"**Actuación recomendada actual:** {accion}")
+
+    st.markdown(
+        '<div class="form-section-title">Selecciona una actuación</div>',
         unsafe_allow_html=True
     )
 
@@ -1426,7 +1424,7 @@ def pantalla_demandado():
                     "estado": "Pagado",
                     "respuesta_deudor": "Pagar deuda",
                     "fecha_respuesta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "accion_recomendada": "Archivar expediente tras comprobar pago",
+                    "accion_recomendada": "Comprobar pago y archivar actuaciones",
                     "borrador": borrador
                 }
             )
@@ -1457,7 +1455,10 @@ def pantalla_demandado():
             st.text_area("Borrador generado", borrador, height=300)
 
     if st.session_state.get("mostrar_oposicion", False):
-        st.markdown('<div class="form-section-title">Formulario de oposición</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="form-section-title">Formulario de oposición</div>',
+            unsafe_allow_html=True
+        )
 
         with st.form("form_oposicion"):
             motivo = st.text_area(
@@ -1499,8 +1500,6 @@ def pantalla_demandado():
 
             st.success("Oposición registrada correctamente.")
             st.text_area("Borrador generado", borrador, height=320)
-
-
 # ============================================================
 # EJECUCIÓN PRINCIPAL
 # ============================================================
