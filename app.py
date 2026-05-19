@@ -178,7 +178,60 @@ def buscar_patron(texto, patrones):
             return match.group(1).strip()
     return ""
 
+def detectar_documentos_art_812(texto):
+    texto = texto.lower()
 
+    categorias = {
+        "documento_firmado_deudor": [
+            "firmado por el deudor",
+            "firma del deudor",
+            "sello del deudor",
+            "impronta",
+            "marca del deudor",
+            "firma electrónica",
+            "señal electrónica",
+        ],
+        "documentos_comerciales_habituales": [
+            "factura",
+            "facturas",
+            "albarán",
+            "albaranes",
+            "certificación",
+            "certificaciones",
+            "telegrama",
+            "fax",
+            "telefax",
+            "recibo",
+            "estado de cuenta",
+            "comprobante",
+        ],
+        "relacion_anterior_duradera": [
+            "relación comercial anterior",
+            "relación anterior duradera",
+            "relación contractual continuada",
+            "contrato marco",
+            "contrato de suministro",
+            "historial de pedidos",
+            "documentos comerciales",
+        ],
+        "comunidad_propietarios": [
+            "certificación de impago",
+            "gastos comunes",
+            "comunidad de propietarios",
+            "inmueble urbano",
+        ],
+    }
+
+    detectados = {}
+
+    for categoria, palabras in categorias.items():
+        coincidencias = [p for p in palabras if p in texto]
+        detectados[categoria] = coincidencias
+
+    hay_documento_valido = any(len(v) > 0 for v in detectados.values())
+
+    return hay_documento_valido, detectados
+    
 def extraer_datos_demanda(texto):
     texto_unido = re.sub(r"\s+", " ", texto)
 
@@ -217,26 +270,59 @@ def extraer_datos_demanda(texto):
     cuantia = limpiar_numero(cuantia_txt)
 
     palabras_deuda = [
-        "factura",
-        "contrato",
-        "recibo",
-        "pagaré",
-        "letra de cambio",
-        "certificación",
-        "documento de deuda",
-        "documento justificativo",
-        "estado de cuenta",
-        "comprobante",
-        "obligación de pago",
-        "crédito vencido",
-        "deuda líquida",
-        "deuda exigible",
-    ]
+    # Documentos firmados o con señal del deudor
+    "firmado por el deudor",
+    "firma del deudor",
+    "sello del deudor",
+    "impronta",
+    "marca del deudor",
+    "firma electrónica",
+    "señal electrónica",
 
-    hay_documento_deuda = any(
-        palabra in texto_unido.lower()
-        for palabra in palabras_deuda
-    )
+    # Documentos habituales en relaciones comerciales
+    "factura",
+    "facturas",
+    "albarán",
+    "albaranes",
+    "albarán de entrega",
+    "certificación",
+    "certificaciones",
+    "telegrama",
+    "telegramas",
+    "fax",
+    "telefax",
+    "recibo",
+    "recibos",
+    "estado de cuenta",
+    "comprobante",
+
+    # Relación anterior duradera
+    "relación comercial anterior",
+    "relación anterior duradera",
+    "relación contractual continuada",
+    "documentos comerciales",
+    "contrato marco",
+    "contrato de suministro",
+    "historial de pedidos",
+
+    # Comunidad de propietarios
+    "certificación de impago",
+    "gastos comunes",
+    "comunidad de propietarios",
+    "inmueble urbano",
+
+    # Requisitos de la deuda
+    "deuda dineraria",
+    "deuda líquida",
+    "deuda determinada",
+    "deuda vencida",
+    "deuda exigible",
+    "cantidad determinada",
+    "crédito vencido",
+    "obligación de pago",
+]
+
+    hay_documento_deuda, documentos_art_812 = detectar_documentos_art_812(texto_unido)
 
     menciona_monitorio = "monitorio" in texto_unido.lower()
 
@@ -274,6 +360,7 @@ def extraer_datos_demanda(texto):
         "cuantia": cuantia,
         "menciona_monitorio": menciona_monitorio,
         "hay_documento_deuda": hay_documento_deuda,
+        "documentos_art_812": documentos_art_812,
         "peticion": peticion,
         "hechos_resumidos": texto_unido[:1000],
         "datos_faltantes": datos_faltantes,
@@ -795,13 +882,57 @@ pagina = st.sidebar.radio(
 if pagina == "1. Subir demanda":
     st.header("📄 Subir demanda o solicitud monitoria")
 
-    archivo = st.file_uploader(
-        "Sube un documento TXT, DOCX o PDF",
-        type=["txt", "docx", "pdf"]
-    )
+    archivos = st.file_uploader(
+    "Sube la demanda y los documentos acreditativos de la deuda",
+    type=["txt", "docx", "pdf"],
+    accept_multiple_files=True
+)
 
-    if archivo is not None:
-        texto = leer_documento(archivo)
+if archivos:
+    textos = []
+    nombres_archivos = []
+
+    for archivo in archivos:
+        texto_archivo = leer_documento(archivo)
+        textos.append(f"\n\n--- DOCUMENTO: {archivo.name} ---\n{texto_archivo}")
+        nombres_archivos.append(archivo.name)
+
+    texto = "\n".join(textos)
+    st.session_state.texto_subido = texto
+
+    datos_extraidos = extraer_datos_demanda(texto)
+    st.session_state.datos_extraidos = datos_extraidos
+
+    st.subheader("Documentos subidos")
+    for nombre in nombres_archivos:
+        st.write(f"📎 {nombre}")
+
+    st.subheader("Texto leído de los documentos")
+    st.text_area("Contenido detectado", texto, height=260)
+
+    st.subheader("Datos extraídos automáticamente")
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Demandante", datos_extraidos["demandante"] or "No detectado")
+    col2.metric("Demandado", datos_extraidos["demandado"] or "No detectado")
+    col3.metric("Cuantía", f"{datos_extraidos['cuantia']:,.2f} L")
+
+    st.write(f"**Menciona proceso monitorio:** {'Sí' if datos_extraidos['menciona_monitorio'] else 'No'}")
+    st.write(f"**Detecta documento válido art. 812 LEC:** {'Sí' if datos_extraidos['hay_documento_deuda'] else 'No'}")
+    st.subheader("Documentación detectada según art. 812 LEC")
+
+    docs_812 = datos_extraidos.get("documentos_art_812", {})
+    
+    for categoria, coincidencias in docs_812.items():
+        if coincidencias:
+            st.success(f"{categoria}: {', '.join(coincidencias)}")
+        else:
+            st.info(f"{categoria}: no detectado")
+
+    if datos_extraidos["datos_faltantes"]:
+        st.warning("Datos faltantes o dudosos: " + ", ".join(datos_extraidos["datos_faltantes"]))
+    else:
+        st.success("El sistema detecta demanda y documentación mínima para iniciar el flujo.")
         st.session_state.texto_subido = texto
 
         datos_extraidos = extraer_datos_demanda(texto)
