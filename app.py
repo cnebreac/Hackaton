@@ -81,12 +81,21 @@ st.markdown(
         background: #f3f4f6;
     }
 
-    .institutional-header {
+        .institutional-header {
         background: #003366;
         color: white;
         padding: 1.15rem 1.5rem;
         border-bottom: 5px solid #f2c94c;
         margin-bottom: 1.2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .institutional-header-left {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
 
     .institutional-title {
@@ -99,6 +108,24 @@ st.markdown(
     .institutional-user {
         color: #e5e7eb;
         font-size: 0.9rem;
+    }
+
+    .logout-header-link {
+        display: inline-block;
+        font-size: 0.8rem;
+        padding: 0.38rem 0.75rem;
+        border-radius: 3px;
+        background: rgba(255,255,255,0.12);
+        color: #eaf2ff !important;
+        border: 1px solid rgba(255,255,255,0.25);
+        text-decoration: none !important;
+        font-weight: 600;
+    }
+
+    .logout-header-link:hover {
+        background: rgba(255,255,255,0.20);
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.38);
     }
 
     .login-wrapper {
@@ -279,30 +306,6 @@ st.markdown(
         font-weight: 600 !important;
     }
 
-    .logout-fixed {
-        position: fixed;
-        right: 1.4rem;
-        bottom: 1.2rem;
-        z-index: 9999;
-        width: 135px;
-    }
-
-    .logout-fixed div.stButton > button {
-        font-size: 0.76rem;
-        padding: 0.35rem 0.55rem;
-        min-height: 32px;
-        border-radius: 3px;
-        background-color: white;
-        color: #003366;
-        border: 1px solid #003366;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.14);
-    }
-
-    .logout-fixed div.stButton > button:hover {
-        background-color: #eef2f7;
-        color: #00264d;
-        border: 1px solid #00264d;
-    }
     </style>
     """,
     unsafe_allow_html=True
@@ -328,7 +331,23 @@ if "registro_demandado" not in st.session_state:
 if "mostrar_oposicion" not in st.session_state:
     st.session_state.mostrar_oposicion = False
 
+def cerrar_sesion():
+    st.session_state.autenticado = False
+    st.session_state.perfil = None
+    st.session_state.usuario_nombre = ""
+    st.session_state.registro_demandado = None
+    st.session_state.mostrar_oposicion = False
 
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
+
+    st.rerun()
+
+
+if "logout" in st.query_params:
+    cerrar_sesion()
 # ============================================================
 # UTILIDADES
 # ============================================================
@@ -886,26 +905,20 @@ def topbar():
     st.markdown(
         f"""
         <div class="institutional-header">
-            <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
-            <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
+            <div class="institutional-header-left">
+                <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
+                <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
+            </div>
+
+            <div>
+                <a class="logout-header-link" href="?logout=1" target="_self">
+                    Cerrar sesión
+                </a>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
-
-
-def boton_cerrar_sesion_fijo():
-    st.markdown('<div class="logout-fixed">', unsafe_allow_html=True)
-
-    if st.button("Cerrar sesión", key="btn_cerrar_sesion_fijo"):
-        st.session_state.autenticado = False
-        st.session_state.perfil = None
-        st.session_state.usuario_nombre = ""
-        st.session_state.registro_demandado = None
-        st.session_state.mostrar_oposicion = False
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1394,8 +1407,6 @@ def pantalla_demandado():
 if not st.session_state.autenticado:
     pantalla_login()
     st.stop()
-
-boton_cerrar_sesion_fijo()
 
 if st.session_state.perfil is None:
     topbar()
