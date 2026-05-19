@@ -1165,7 +1165,7 @@ def pantalla_demandante():
     st.markdown('<div class="form-section-title">Documentos acreditativos</div>', unsafe_allow_html=True)
 
     documentos_files = st.file_uploader(
-        f"Sube los documentos acreditativos necesarios. Mínimo requerido: {MIN_DOCUMENTOS_ACREDITATIVOS}",
+        f"Sube los documentos acreditativos necesarios.",
         type=["pdf", "docx", "txt"],
         accept_multiple_files=True,
         key="documentos_acreditativos"
@@ -1236,7 +1236,7 @@ def pantalla_demandante():
     )
 
     if documentos_validos:
-        st.success("Documentos acreditativos válidos: se ha aportado el número mínimo requerido.")
+        st.success("Documentos acreditativos válidos: se ha aportado los documentos requeridos.")
     else:
         st.error(
             f"Faltan documentos acreditativos. Se requiere un mínimo de "
