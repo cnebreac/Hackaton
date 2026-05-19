@@ -71,9 +71,10 @@ st.markdown(
     }
 
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 0.5rem;
         padding-left: 3rem;
         padding-right: 3rem;
+        max-width: 1200px;
     }
 
     .main {
@@ -84,7 +85,7 @@ st.markdown(
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
     }
 
     .topbar-title {
@@ -100,8 +101,8 @@ st.markdown(
 
     .login-wrapper {
         max-width: 520px;
-        margin: 5rem auto 2rem auto;
-        padding: 2.8rem;
+        margin: 3rem auto 1.2rem auto;
+        padding: 2.5rem 2.8rem;
         background: white;
         border-radius: 30px;
         box-shadow: 0 25px 70px rgba(15, 23, 42, 0.15);
@@ -144,24 +145,26 @@ st.markdown(
     .login-subtitle {
         font-size: 1rem;
         color: #6b7280;
-        margin-bottom: 1.8rem;
+        margin-bottom: 1.5rem;
     }
 
     .blank-selection {
-        min-height: 72vh;
+        min-height: auto;
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: center;
+        padding-top: 0.5rem;
     }
 
     .selection-card {
         background: white;
         border-radius: 30px;
-        padding: 3rem;
+        padding: 2rem 2.5rem;
         width: 100%;
         max-width: 900px;
-        box-shadow: 0 25px 70px rgba(15, 23, 42, 0.12);
+        box-shadow: 0 20px 55px rgba(15, 23, 42, 0.10);
         border: 1px solid #e5e7eb;
+        margin-top: 0;
     }
 
     .selection-title {
@@ -175,28 +178,28 @@ st.markdown(
     .selection-subtitle {
         text-align: center;
         color: #6b7280;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
     }
 
     .role-card {
-        padding: 2rem;
+        padding: 1.7rem;
         border-radius: 24px;
         background: #ffffff;
         border: 1px solid #e5e7eb;
         box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
         text-align: center;
-        min-height: 230px;
+        min-height: 205px;
         margin-bottom: 1rem;
     }
 
     .role-card-debt {
-        padding: 2rem;
+        padding: 1.7rem;
         border-radius: 24px;
         background: #fff7ed;
         border: 2px solid #f97316;
         box-shadow: 0 18px 45px rgba(249, 115, 22, 0.22);
         text-align: center;
-        min-height: 230px;
+        min-height: 205px;
         margin-bottom: 1rem;
     }
 
@@ -224,7 +227,7 @@ st.markdown(
         border-left: 6px solid #f97316;
         border-radius: 18px;
         padding: 1rem 1.3rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.3rem;
         color: #7c2d12;
         font-weight: 650;
     }
@@ -457,7 +460,10 @@ def buscar_deudas_por_nombre(nombre):
         & (df["estado_norm"].isin(estados_pendientes))
     ].copy()
 
-    coincidencias = coincidencias.drop(columns=["demandado_norm", "estado_norm"], errors="ignore")
+    coincidencias = coincidencias.drop(
+        columns=["demandado_norm", "estado_norm"],
+        errors="ignore"
+    )
 
     return coincidencias
 
@@ -828,7 +834,8 @@ def pantalla_login():
 
         certificado = st.file_uploader(
             "Certificado digital",
-            type=["pdf", "txt", "cer", "crt", "p12", "pfx"]
+            type=["pdf", "txt", "cer", "crt", "p12", "pfx"],
+            accept_multiple_files=False
         )
 
         entrar = st.button(
@@ -845,7 +852,7 @@ def pantalla_login():
 
 
 # ============================================================
-# CABECERA SIN MENÚ LATERAL
+# CABECERA
 # ============================================================
 
 def topbar():
@@ -875,7 +882,7 @@ def topbar():
 
 
 # ============================================================
-# PANTALLA EN BLANCO CON DEMANDANTE / DEMANDADO
+# PANTALLA PRINCIPAL DEMANDANTE / DEMANDADO
 # ============================================================
 
 def pantalla_perfiles():
@@ -1000,7 +1007,8 @@ def pantalla_demandante():
         demanda_file = st.file_uploader(
             "Sube la demanda o solicitud principal",
             type=["pdf", "docx", "txt"],
-            key="demanda_principal"
+            key="demanda_principal",
+            accept_multiple_files=False
         )
 
         if demanda_file is not None:
