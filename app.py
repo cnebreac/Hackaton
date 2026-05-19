@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import re
 from datetime import date, timedelta
-from io import BytesIO
 
 try:
     from docx import Document
@@ -16,7 +15,7 @@ except ImportError:
 
 
 # ============================================================
-# CONFIGURACIÓN GENERAL
+# CONFIGURACIÓN
 # ============================================================
 
 st.set_page_config(
@@ -38,7 +37,7 @@ ARTICULOS = {
     },
     "subsanacion": {
         "referencia": "Arts. 586.3 y 587.1 CPC",
-        "resumen": "Si la demanda presenta defectos formales, se requiere subsanación en plazo legal."
+        "resumen": "Si la demanda presenta defectos formales, se requiere subsanación."
     },
     "archivo_subsanacion": {
         "referencia": "Art. 587.2 CPC",
@@ -89,14 +88,14 @@ def leer_txt(archivo):
 
 def leer_docx(archivo):
     if Document is None:
-        return "ERROR: Falta instalar python-docx. Ejecuta: pip install python-docx"
+        return "ERROR: instala python-docx con: pip install python-docx"
 
     doc = Document(archivo)
     textos = []
 
     for p in doc.paragraphs:
         if p.text.strip():
-            textos.append(p.text)
+            textos.append(p.text.strip())
 
     for tabla in doc.tables:
         for fila in tabla.rows:
@@ -108,7 +107,7 @@ def leer_docx(archivo):
 
 def leer_pdf(archivo):
     if PyPDF2 is None:
-        return "ERROR: Falta instalar PyPDF2. Ejecuta: pip install PyPDF2"
+        return "ERROR: instala PyPDF2 con: pip install PyPDF2"
 
     lector = PyPDF2.PdfReader(archivo)
     textos = []
@@ -121,7 +120,7 @@ def leer_pdf(archivo):
     return "\n".join(textos)
 
 
-def leer_documento_subido(archivo):
+def leer_documento(archivo):
     nombre = archivo.name.lower()
 
     if nombre.endswith(".txt"):
@@ -137,29 +136,22 @@ def leer_documento_subido(archivo):
 
 
 # ============================================================
-# EXTRACCIÓN DE DATOS DESDE LA DEMANDA
+# EXTRACCIÓN AUTOMÁTICA
 # ============================================================
 
 def limpiar_numero(texto_numero):
-    """
-    Convierte textos como:
-    50,000.00
-    50.000,00
-    50000
-    en float.
-    """
     if not texto_numero:
         return 0.0
 
-    texto_numero = texto_numero.replace("L", "")
+    texto_numero = texto_numero.lower()
     texto_numero = texto_numero.replace("lempiras", "")
+    texto_numero = texto_numero.replace("l.", "")
+    texto_numero = texto_numero.replace("l ", "")
     texto_numero = texto_numero.strip()
 
     if "," in texto_numero and "." in texto_numero:
-        # Caso 50,000.00
         if texto_numero.find(",") < texto_numero.find("."):
             texto_numero = texto_numero.replace(",", "")
-        # Caso 50.000,00
         else:
             texto_numero = texto_numero.replace(".", "").replace(",", ".")
     elif "," in texto_numero:
@@ -188,48 +180,43 @@ def buscar_patron(texto, patrones):
 
 
 def extraer_datos_demanda(texto):
-    """
-    Extractor básico para hackathon.
-    La idea es convertir el documento en datos estructurados.
-    Después estos datos entran en el motor de reglas.
-    """
-
-    texto_limpio = re.sub(r"\s+", " ", texto)
+    texto_unido = re.sub(r"\s+", " ", texto)
 
     demandante = buscar_patron(
-        texto_limpio,
+        texto_unido,
         [
-            r"demandante[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:demandado|contra|,|\.|$)",
-            r"acreedor[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:deudor|contra|,|\.|$)",
-            r"promovido por[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:contra|frente a|,|\.|$)",
-            r"a instancia de[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:contra|frente a|,|\.|$)"
+            r"demandante[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
+            r"acreedor[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
+            r"promovido por[:\s]+(.+?)(?:contra|frente a|,|\.)",
+            r"a instancia de[:\s]+(.+?)(?:contra|frente a|,|\.)",
         ]
     )
 
     demandado = buscar_patron(
-        texto_limpio,
+        texto_unido,
         [
-            r"demandado[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:,|\.|$)",
-            r"deudor[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:,|\.|$)",
-            r"contra[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:,|\.|$)",
-            r"frente a[:\s]+([A-ZÁÉÍÓÚÑa-záéíóúñ\s\.]+?)(?:,|\.|$)"
+            r"demandado[:\s]+(.+?)(?:,|\.)",
+            r"deudor[:\s]+(.+?)(?:,|\.)",
+            r"contra[:\s]+(.+?)(?:,|\.)",
+            r"frente a[:\s]+(.+?)(?:,|\.)",
         ]
     )
 
-    cuantia_texto = buscar_patron(
-        texto_limpio,
+    cuantia_txt = buscar_patron(
+        texto_unido,
         [
             r"cuantía[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
             r"importe[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
             r"cantidad[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
             r"suma[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
-            r"reclama(?:\s+la)?\s+cantidad\s+de\s+(?:L\.?\s*)?([\d\.,]+)"
+            r"reclama(?:\s+la)?\s+cantidad\s+de\s+(?:L\.?\s*)?([\d\.,]+)",
+            r"por\s+importe\s+de\s+(?:L\.?\s*)?([\d\.,]+)",
         ]
     )
 
-    cuantia = limpiar_numero(cuantia_texto)
+    cuantia = limpiar_numero(cuantia_txt)
 
-    palabras_documento_deuda = [
+    palabras_deuda = [
         "factura",
         "contrato",
         "recibo",
@@ -240,53 +227,65 @@ def extraer_datos_demanda(texto):
         "documento justificativo",
         "estado de cuenta",
         "comprobante",
-        "obligación de pago"
+        "obligación de pago",
+        "crédito vencido",
+        "deuda líquida",
+        "deuda exigible",
     ]
 
     hay_documento_deuda = any(
-        palabra.lower() in texto_limpio.lower()
-        for palabra in palabras_documento_deuda
+        palabra in texto_unido.lower()
+        for palabra in palabras_deuda
     )
 
-    menciona_monitorio = "monitorio" in texto_limpio.lower()
+    menciona_monitorio = "monitorio" in texto_unido.lower()
 
     peticion = buscar_patron(
-        texto_limpio,
+        texto_unido,
         [
-            r"solicito[:\s]+(.{20,250})",
-            r"pido[:\s]+(.{20,250})",
-            r"suplico[:\s]+(.{20,250})",
-            r"petición[:\s]+(.{20,250})"
+            r"solicito[:\s]+(.{20,300})",
+            r"suplico[:\s]+(.{20,300})",
+            r"pido[:\s]+(.{20,300})",
+            r"petición[:\s]+(.{20,300})",
         ]
     )
 
-    hechos_resumidos = texto_limpio[:900]
+    datos_faltantes = []
 
-    datos = {
+    if not demandante:
+        datos_faltantes.append("Demandante / acreedor")
+    if not demandado:
+        datos_faltantes.append("Demandado / deudor")
+    if cuantia <= 0:
+        datos_faltantes.append("Cuantía")
+    if not hay_documento_deuda:
+        datos_faltantes.append("Documento acreditativo de deuda")
+
+    cumple_requisitos_auto = (
+        bool(demandante)
+        and bool(demandado)
+        and cuantia > 0
+        and hay_documento_deuda
+    )
+
+    return {
         "demandante": demandante,
         "demandado": demandado,
         "cuantia": cuantia,
         "menciona_monitorio": menciona_monitorio,
-        "hay_documento_de_deuda": hay_documento_deuda,
+        "hay_documento_deuda": hay_documento_deuda,
         "peticion": peticion,
-        "hechos_resumidos": hechos_resumidos,
-        "datos_faltantes": []
+        "hechos_resumidos": texto_unido[:1000],
+        "datos_faltantes": datos_faltantes,
+        "demanda_presentada_auto": True,
+        "tribunal_competente_auto": True,
+        "cumple_requisitos_auto": cumple_requisitos_auto,
+        "subsanacion_requerida_auto": not cumple_requisitos_auto,
     }
-
-    if not demandante:
-        datos["datos_faltantes"].append("Demandante / acreedor")
-    if not demandado:
-        datos["datos_faltantes"].append("Demandado / deudor")
-    if cuantia == 0:
-        datos["datos_faltantes"].append("Cuantía")
-    if not hay_documento_deuda:
-        datos["datos_faltantes"].append("Documento acreditativo de la deuda")
-
-    return datos
 
 
 # ============================================================
-# PLAZOS Y RIESGOS
+# PLAZOS
 # ============================================================
 
 def fecha_vencimiento(fecha_inicio, plazo_dias):
@@ -326,10 +325,6 @@ def pintar_riesgo(riesgo):
     return "⚪ Sin plazo"
 
 
-# ============================================================
-# MOTOR DE REGLAS DEL PROCESO MONITORIO
-# ============================================================
-
 def completar_plazo(resultado, fecha_inicio):
     plazo = resultado.get("plazo_dias")
 
@@ -341,12 +336,11 @@ def completar_plazo(resultado, fecha_inicio):
     return resultado
 
 
-def evaluar_expediente(datos):
-    """
-    Esta función es el corazón del sistema.
-    Recibe datos estructurados y devuelve la fase procesal.
-    """
+# ============================================================
+# MOTOR DE REGLAS
+# ============================================================
 
+def evaluar_expediente(datos):
     resultado = {
         "estado": "Pendiente de evaluación",
         "articulo": "",
@@ -359,7 +353,6 @@ def evaluar_expediente(datos):
         "explicacion": "No se ha podido determinar la fase procesal."
     }
 
-    # 1. No hay demanda
     if not datos["demanda_presentada"]:
         art = ARTICULOS["inicio_demanda"]
         resultado.update({
@@ -367,11 +360,10 @@ def evaluar_expediente(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Esperar presentación de demanda o solicitud por escrito",
-            "explicacion": "El proceso no puede avanzar porque todavía no consta demanda presentada."
+            "explicacion": "No consta demanda presentada, por lo que el proceso no puede iniciarse."
         })
         return resultado
 
-    # 2. Competencia
     if not datos["tribunal_competente"]:
         art = ARTICULOS["competencia"]
         resultado.update({
@@ -379,11 +371,10 @@ def evaluar_expediente(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Rechazar de plano y remitir al tribunal competente",
-            "explicacion": "El tribunal debe examinar de oficio su competencia. Si no es competente, no debe continuar con el fondo."
+            "explicacion": "El tribunal debe examinar su competencia antes de continuar."
         })
         return resultado
 
-    # 3. Requisitos de admisibilidad
     if not datos["cumple_requisitos"]:
         if datos["subsanacion_requerida"] and not datos["demanda_subsanada"]:
             dias = dias_restantes(datos["fecha_requerimiento_subsanacion"], 5)
@@ -395,7 +386,7 @@ def evaluar_expediente(datos):
                     "articulo": art["referencia"],
                     "resumen_articulo": art["resumen"],
                     "accion": "Archivar definitivamente el expediente",
-                    "explicacion": "Se requirió subsanación y el plazo ha vencido sin que conste subsanación."
+                    "explicacion": "Se requirió subsanación y el plazo ha vencido sin corrección."
                 })
                 return resultado
 
@@ -404,9 +395,9 @@ def evaluar_expediente(datos):
                 "estado": "Subsanación pendiente",
                 "articulo": art["referencia"],
                 "resumen_articulo": art["resumen"],
-                "accion": "Esperar subsanación del demandante",
+                "accion": "Esperar o requerir subsanación del demandante",
                 "plazo_dias": 5,
-                "explicacion": "La demanda presenta defectos formales y el demandante está dentro del plazo para corregirlos."
+                "explicacion": "La demanda tiene defectos o datos faltantes. Procede subsanar."
             })
             return completar_plazo(resultado, datos["fecha_requerimiento_subsanacion"])
 
@@ -417,11 +408,10 @@ def evaluar_expediente(datos):
             "resumen_articulo": art["resumen"],
             "accion": "Emitir requerimiento de subsanación por cinco días",
             "plazo_dias": 5,
-            "explicacion": "La demanda no cumple todos los requisitos de admisibilidad. Procede requerir subsanación."
+            "explicacion": "La demanda no cumple los requisitos mínimos para su admisión."
         })
         return completar_plazo(resultado, datos["fecha_requerimiento_subsanacion"])
 
-    # 4. Demanda completa, pero no admitida todavía
     if datos["cumple_requisitos"] and not datos["demanda_admitida"]:
         art = ARTICULOS["admision_requerimiento"]
         resultado.update({
@@ -429,11 +419,10 @@ def evaluar_expediente(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Admitir la demanda y requerir al deudor para pagar u oponerse",
-            "explicacion": "La demanda cumple los requisitos y el tribunal es competente. Procede admitirla."
+            "explicacion": "La demanda contiene datos básicos suficientes y documento de deuda. Procede admisión inicial."
         })
         return resultado
 
-    # 5. Admitida, pero sin notificar al deudor
     if datos["demanda_admitida"] and not datos["deudor_notificado"]:
         art = ARTICULOS["admision_requerimiento"]
         resultado.update({
@@ -441,14 +430,12 @@ def evaluar_expediente(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Notificar al deudor el requerimiento de pago u oposición",
-            "explicacion": "La demanda ya está admitida, pero todavía debe notificarse formalmente al deudor."
+            "explicacion": "La demanda ya está admitida, pero falta notificar al deudor."
         })
         return resultado
 
-    # 6. Deudor notificado
     if datos["deudor_notificado"]:
 
-        # 6.1 Pago
         if datos["demandado_pago"]:
             art = ARTICULOS["pago"]
             resultado.update({
@@ -456,15 +443,13 @@ def evaluar_expediente(datos):
                 "articulo": art["referencia"],
                 "resumen_articulo": art["resumen"],
                 "accion": "Entregar comprobante de pago y archivar actuaciones",
-                "explicacion": "El demandado ha pagado la deuda reclamada. El proceso monitorio finaliza por pago."
+                "explicacion": "El demandado ha pagado la cantidad reclamada."
             })
             return resultado
 
-        # 6.2 Oposición
         if datos["demandado_oposicion"]:
             return evaluar_oposicion(datos)
 
-        # 6.3 Silencio del deudor
         dias = dias_restantes(datos["fecha_notificacion_deudor"], 20)
 
         if dias is not None and dias < 0:
@@ -474,7 +459,7 @@ def evaluar_expediente(datos):
                 "articulo": art["referencia"],
                 "resumen_articulo": art["resumen"],
                 "accion": "Dictar auto iniciando ejecución por vía de apremio",
-                "explicacion": "El deudor fue notificado y ha vencido el plazo de veinte días sin pago ni oposición."
+                "explicacion": "El deudor fue notificado y han pasado veinte días sin pago ni oposición."
             })
             return resultado
 
@@ -485,7 +470,7 @@ def evaluar_expediente(datos):
             "resumen_articulo": art["resumen"],
             "accion": "Controlar vencimiento del plazo de veinte días",
             "plazo_dias": 20,
-            "explicacion": "El deudor está dentro del plazo legal para pagar o formular oposición."
+            "explicacion": "El deudor está dentro del plazo para pagar o formular oposición."
         })
         return completar_plazo(resultado, datos["fecha_notificacion_deudor"])
 
@@ -505,7 +490,6 @@ def evaluar_oposicion(datos):
         "explicacion": ""
     }
 
-    # Plus petición
     if datos["plus_peticion"]:
         art = ARTICULOS["plus_peticion"]
         resultado.update({
@@ -513,11 +497,10 @@ def evaluar_oposicion(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Continuar respecto de la cantidad reconocida como debida",
-            "explicacion": "La oposición se basa en que se reclama una cantidad superior a la debida."
+            "explicacion": "La oposición sostiene que se reclama más cantidad de la debida."
         })
         return resultado
 
-    # Todavía no se dio traslado al demandante
     if not datos["traslado_demandante"]:
         art = ARTICULOS["oposicion"]
         resultado.update({
@@ -525,11 +508,10 @@ def evaluar_oposicion(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Admitir oposición y dar traslado al demandante",
-            "explicacion": "El demandado se ha opuesto. El siguiente paso es dar traslado al demandante."
+            "explicacion": "El demandado ha presentado oposición y debe darse traslado al demandante."
         })
         return resultado
 
-    # Según cuantía: abreviado u ordinario
     if datos["cuantia"] <= LIMITE_ABREVIADO:
         art = ARTICULOS["abreviado"]
         resultado.update({
@@ -537,11 +519,10 @@ def evaluar_oposicion(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Convocar audiencia de procedimiento abreviado",
-            "explicacion": "La cuantía no excede de 50.000 lempiras, por lo que corresponde procedimiento abreviado."
+            "explicacion": "La cuantía no excede de 50.000 lempiras."
         })
         return resultado
 
-    # Cuantía superior: ordinario
     if datos["cuantia"] > LIMITE_ABREVIADO:
         if not datos["demanda_ordinaria_presentada"]:
             dias = dias_restantes(datos["fecha_traslado_demandante"], 30)
@@ -553,7 +534,7 @@ def evaluar_oposicion(datos):
                     "articulo": art["referencia"],
                     "resumen_articulo": art["resumen"],
                     "accion": "Sobreseer actuaciones y condenar en costas al acreedor",
-                    "explicacion": "La cuantía exige procedimiento ordinario, pero no consta demanda ordinaria dentro del plazo."
+                    "explicacion": "Tras la oposición, la cuantía exige ordinario, pero no consta demanda ordinaria en plazo."
                 })
                 return resultado
 
@@ -564,7 +545,7 @@ def evaluar_oposicion(datos):
                 "resumen_articulo": art["resumen"],
                 "accion": "Esperar presentación de demanda ordinaria por el acreedor",
                 "plazo_dias": 30,
-                "explicacion": "Al exceder la cuantía de 50.000 lempiras, el acreedor debe presentar demanda ordinaria."
+                "explicacion": "Al exceder la cuantía de 50.000 lempiras, debe presentarse demanda ordinaria."
             })
             return completar_plazo(resultado, datos["fecha_traslado_demandante"])
 
@@ -574,7 +555,7 @@ def evaluar_oposicion(datos):
             "articulo": art["referencia"],
             "resumen_articulo": art["resumen"],
             "accion": "Continuar por los trámites del procedimiento ordinario",
-            "explicacion": "El acreedor ha presentado demanda ordinaria tras la oposición."
+            "explicacion": "El acreedor ya presentó demanda ordinaria tras la oposición."
         })
         return resultado
 
@@ -582,7 +563,7 @@ def evaluar_oposicion(datos):
 
 
 # ============================================================
-# GENERACIÓN DE BORRADORES
+# BORRADORES
 # ============================================================
 
 def generar_borrador(datos, resultado):
@@ -591,172 +572,153 @@ def generar_borrador(datos, resultado):
     demandado = datos.get("demandado", "parte demandada")
     cuantia = datos.get("cuantia", 0.0)
 
-    estado = resultado["estado"]
-    articulo = resultado["articulo"]
-    accion = resultado["accion"]
-
     encabezado = f"""
 EXPEDIENTE: {expediente}
 DEMANDANTE: {demandante}
 DEMANDADO: {demandado}
 CUANTÍA: {cuantia:,.2f} lempiras
 
-REFERENCIA LEGAL: {articulo}
-ESTADO DETECTADO: {estado}
+ESTADO DETECTADO: {resultado['estado']}
+REFERENCIA LEGAL: {resultado['articulo']}
+RESUMEN NORMATIVO: {resultado['resumen_articulo']}
+
 """
 
-    if "subsanación" in estado.lower() or "incompleta" in estado.lower():
-        cuerpo = f"""
-AUTO DE REQUERIMIENTO DE SUBSANACIÓN
+    estado = resultado["estado"].lower()
 
-Visto el escrito presentado por la parte demandante, y apreciándose que la solicitud inicial no reúne todos los requisitos necesarios para su admisión, procede requerir a la parte actora para que subsane los defectos advertidos en el plazo legal de cinco días.
-
-En atención a lo anterior, se acuerda requerir a {demandante} para que proceda a la subsanación correspondiente, con apercibimiento de archivo definitivo en caso de no hacerlo.
-
-PRÓXIMA ACTUACIÓN:
-{accion}
-"""
-        return encabezado + cuerpo
-
-    if "lista para admisión" in estado.lower():
+    if "lista para admisión" in estado:
         cuerpo = f"""
 AUTO DE ADMISIÓN DE DEMANDA MONITORIA
 
-Visto el escrito presentado por {demandante} frente a {demandado}, y apreciándose que concurren los presupuestos iniciales de admisibilidad, procede admitir la solicitud monitoria.
+Visto el escrito presentado por {demandante} frente a {demandado}, y apreciándose que la solicitud contiene los datos básicos necesarios y documentación acreditativa de la deuda reclamada, procede admitir la demanda monitoria.
 
 En consecuencia, se acuerda requerir al deudor para que, en el plazo legal de veinte días, pague la cantidad reclamada o comparezca formulando oposición.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "pendiente de notificación" in estado.lower():
+    if "subsanación" in estado or "incompleta" in estado:
+        cuerpo = f"""
+AUTO DE REQUERIMIENTO DE SUBSANACIÓN
+
+Visto el escrito presentado, y apreciándose que la solicitud inicial no reúne todos los requisitos necesarios para su admisión, procede requerir a la parte actora para que subsane los defectos advertidos en el plazo legal de cinco días.
+
+PRÓXIMA ACTUACIÓN:
+{resultado['accion']}
+"""
+        return encabezado + cuerpo
+
+    if "pendiente de notificación" in estado:
         cuerpo = f"""
 DILIGENCIA DE NOTIFICACIÓN AL DEUDOR
 
-Admitida la demanda monitoria, procede practicar la notificación al deudor {demandado}, requiriéndole para que en el plazo legal pague la cantidad reclamada o formule oposición.
+Admitida la demanda monitoria, procede notificar al deudor {demandado}, requiriéndole para que pague o formule oposición en el plazo legal.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "esperando pago" in estado.lower():
+    if "esperando pago" in estado:
         cuerpo = f"""
 INFORME DE CONTROL DE PLAZO
 
-Consta que el deudor {demandado} ha sido notificado del requerimiento de pago. Actualmente se encuentra abierto el plazo legal para que pueda pagar o formular oposición.
+Consta que el deudor ha sido notificado y se encuentra abierto el plazo para pagar o formular oposición.
 
 DÍAS RESTANTES:
-{resultado.get("dias_restantes", "-")}
+{resultado.get('dias_restantes', '-')}
 
 FECHA DE VENCIMIENTO:
-{resultado.get("fecha_vencimiento", "-")}
+{resultado.get('fecha_vencimiento', '-')}
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "pago realizado" in estado.lower():
+    if "pago realizado" in estado:
         cuerpo = f"""
 DILIGENCIA DE PAGO Y ARCHIVO
 
-Constando que el demandado {demandado} ha procedido al pago de la cantidad reclamada, procede entregar el correspondiente comprobante y acordar el archivo de las actuaciones.
+Constando que el demandado ha procedido al pago de la cantidad reclamada, procede entregar el correspondiente comprobante y acordar el archivo de las actuaciones.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "ejecución" in estado.lower() or "apremio" in estado.lower():
+    if "ejecución" in estado or "apremio" in estado:
         cuerpo = f"""
 AUTO DESPACHANDO EJECUCIÓN POR VÍA DE APREMIO
 
 Visto que ha transcurrido el plazo legal conferido al deudor sin que conste pago ni oposición, procede iniciar la ejecución por vía de apremio por la cantidad reclamada.
 
-En consecuencia, se acuerda despachar ejecución frente a {demandado} por importe de {cuantia:,.2f} lempiras, sin perjuicio de la revisión y validación que corresponda por el órgano competente.
+Se genera este borrador para revisión y validación por el órgano competente.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "oposición pendiente" in estado.lower():
+    if "oposición pendiente" in estado:
         cuerpo = f"""
 AUTO DE ADMISIÓN DE OPOSICIÓN Y TRASLADO
 
-Presentado escrito de oposición por {demandado}, procede admitirlo y dar traslado a la parte demandante para que pueda actuar conforme corresponda.
+Presentado escrito de oposición por el demandado, procede admitirlo y dar traslado a la parte demandante para que actúe conforme corresponda.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "plus petición" in estado.lower():
-        cuerpo = f"""
-AUTO SOBRE OPOSICIÓN POR PLUS PETICIÓN
-
-Formulada oposición basada en plus petición, procede continuar las actuaciones respecto de la cantidad reconocida como debida, sin perjuicio de resolver lo controvertido conforme al cauce correspondiente.
-
-PRÓXIMA ACTUACIÓN:
-{accion}
-"""
-        return encabezado + cuerpo
-
-    if "abreviado" in estado.lower():
+    if "abreviado" in estado:
         cuerpo = f"""
 PROVIDENCIA DE CONTINUACIÓN POR PROCEDIMIENTO ABREVIADO
 
-Formulada oposición por el demandado, y no excediendo la cuantía de {LIMITE_ABREVIADO:,.2f} lempiras, procede continuar la tramitación por el procedimiento abreviado.
-
-En consecuencia, se acuerda convocar a las partes a la audiencia correspondiente.
+Formulada oposición y no excediendo la cuantía de {LIMITE_ABREVIADO:,.2f} lempiras, procede continuar la tramitación por el procedimiento abreviado.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "ordinario" in estado.lower() or "pendiente de demanda ordinaria" in estado.lower():
+    if "ordinario" in estado:
         cuerpo = f"""
 PROVIDENCIA DE CONTINUACIÓN POR PROCEDIMIENTO ORDINARIO
 
-Formulada oposición por el demandado y atendida la cuantía reclamada, que excede de {LIMITE_ABREVIADO:,.2f} lempiras, procede continuar por los trámites del procedimiento ordinario.
+Formulada oposición y excediendo la cuantía de {LIMITE_ABREVIADO:,.2f} lempiras, procede continuar por los trámites del procedimiento ordinario.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
-    if "sobreseimiento" in estado.lower():
+    if "sobreseimiento" in estado:
         cuerpo = f"""
 AUTO DE SOBRESEIMIENTO
 
-Constando que, tras la oposición formulada por el demandado, no se ha presentado la demanda correspondiente dentro del plazo legal, procede acordar el sobreseimiento de las actuaciones.
-
-En consecuencia, se acuerda sobreseer el procedimiento, con los efectos procesales que correspondan.
+Constando que no se ha presentado la demanda correspondiente dentro del plazo legal tras la oposición, procede acordar el sobreseimiento de las actuaciones.
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
         return encabezado + cuerpo
 
     cuerpo = f"""
 INFORME DE ESTADO PROCESAL
 
-El sistema ha identificado el siguiente estado procesal:
-
-{resultado["explicacion"]}
+{resultado['explicacion']}
 
 PRÓXIMA ACTUACIÓN:
-{accion}
+{resultado['accion']}
 """
     return encabezado + cuerpo
 
 
 # ============================================================
-# DATOS DE EJEMPLO
+# EJEMPLOS
 # ============================================================
 
 def cargar_ejemplos():
@@ -765,75 +727,31 @@ def cargar_ejemplos():
     return [
         {
             "expediente": "MON-001",
-            "demandante": "Banco Atlántico",
-            "demandado": "Carlos Mejía",
+            "demandante": "Banco Atlántico S.A.",
+            "demandado": "Carlos Mejía Rodríguez",
             "cuantia": 35000.0,
             "demanda_presentada": True,
             "tribunal_competente": True,
             "cumple_requisitos": True,
             "subsanacion_requerida": False,
             "demanda_subsanada": False,
-            "demanda_admitida": True,
-            "deudor_notificado": True,
+            "demanda_admitida": False,
+            "deudor_notificado": False,
             "demandado_pago": False,
             "demandado_oposicion": False,
             "plus_peticion": False,
             "traslado_demandante": False,
             "demanda_ordinaria_presentada": False,
             "fecha_requerimiento_subsanacion": hoy,
-            "fecha_notificacion_deudor": hoy - timedelta(days=10),
+            "fecha_notificacion_deudor": hoy,
             "fecha_traslado_demandante": hoy,
-            "texto_original": ""
-        },
-        {
-            "expediente": "MON-002",
-            "demandante": "Comercial Norte S.A.",
-            "demandado": "Inversiones López",
-            "cuantia": 80000.0,
-            "demanda_presentada": True,
-            "tribunal_competente": True,
-            "cumple_requisitos": True,
-            "subsanacion_requerida": False,
-            "demanda_subsanada": False,
-            "demanda_admitida": True,
-            "deudor_notificado": True,
-            "demandado_pago": False,
-            "demandado_oposicion": False,
-            "plus_peticion": False,
-            "traslado_demandante": False,
-            "demanda_ordinaria_presentada": False,
-            "fecha_requerimiento_subsanacion": hoy,
-            "fecha_notificacion_deudor": hoy - timedelta(days=25),
-            "fecha_traslado_demandante": hoy,
-            "texto_original": ""
-        },
-        {
-            "expediente": "MON-003",
-            "demandante": "Servicios Técnicos HN",
-            "demandado": "María Rivera",
-            "cuantia": 120000.0,
-            "demanda_presentada": True,
-            "tribunal_competente": True,
-            "cumple_requisitos": True,
-            "subsanacion_requerida": False,
-            "demanda_subsanada": False,
-            "demanda_admitida": True,
-            "deudor_notificado": True,
-            "demandado_pago": False,
-            "demandado_oposicion": True,
-            "plus_peticion": False,
-            "traslado_demandante": True,
-            "demanda_ordinaria_presentada": False,
-            "fecha_requerimiento_subsanacion": hoy,
-            "fecha_notificacion_deudor": hoy - timedelta(days=5),
-            "fecha_traslado_demandante": hoy - timedelta(days=20),
-            "texto_original": ""
+            "hechos_resumidos": "Demanda monitoria de ejemplo con factura y contrato."
         }
     ]
 
 
 # ============================================================
-# ESTADO DE SESIÓN
+# SESSION STATE
 # ============================================================
 
 if "expedientes" not in st.session_state:
@@ -851,24 +769,16 @@ if "texto_subido" not in st.session_state:
 # ============================================================
 
 st.title("⚖️ LexMonitor AI")
-st.subheader("MVP para lectura, clasificación y monitorización del proceso monitorio")
-
-st.markdown(
-    """
-    Esta aplicación permite subir una demanda o solicitud monitoria, extraer datos básicos,
-    validar esos datos y aplicar un motor de reglas para determinar la fase procesal,
-    el plazo, el riesgo y la actuación recomendada.
-    """
-)
+st.subheader("Lectura automática y monitorización del proceso monitorio")
 
 st.warning(
-    "Prototipo para hackathon. No dicta sentencias ni sustituye la revisión jurídica humana. "
-    "Genera propuestas y borradores revisables."
+    "Prototipo para hackathon. El sistema no dicta sentencia de forma autónoma: "
+    "extrae datos, aplica reglas procesales y genera borradores revisables."
 )
 
 st.sidebar.title("Menú")
 pagina = st.sidebar.radio(
-    "Selecciona una pantalla",
+    "Selecciona pantalla",
     [
         "1. Subir demanda",
         "2. Dashboard",
@@ -879,54 +789,69 @@ pagina = st.sidebar.radio(
 
 
 # ============================================================
-# PANTALLA 1: SUBIR DEMANDA
+# SUBIR DEMANDA
 # ============================================================
 
 if pagina == "1. Subir demanda":
     st.header("📄 Subir demanda o solicitud monitoria")
 
     archivo = st.file_uploader(
-        "Sube un documento en formato TXT, DOCX o PDF",
+        "Sube un documento TXT, DOCX o PDF",
         type=["txt", "docx", "pdf"]
     )
 
     if archivo is not None:
-        texto = leer_documento_subido(archivo)
+        texto = leer_documento(archivo)
         st.session_state.texto_subido = texto
-
-        st.subheader("Texto detectado")
-        st.text_area("Contenido del documento", texto, height=250)
 
         datos_extraidos = extraer_datos_demanda(texto)
         st.session_state.datos_extraidos = datos_extraidos
 
+        st.subheader("Texto leído del documento")
+        st.text_area("Contenido detectado", texto, height=220)
+
         st.subheader("Datos extraídos automáticamente")
-        st.json(datos_extraidos)
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Demandante", datos_extraidos["demandante"] or "No detectado")
+        col2.metric("Demandado", datos_extraidos["demandado"] or "No detectado")
+        col3.metric("Cuantía", f"{datos_extraidos['cuantia']:,.2f} L")
+
+        st.write(f"**Menciona proceso monitorio:** {'Sí' if datos_extraidos['menciona_monitorio'] else 'No'}")
+        st.write(f"**Detecta documento de deuda:** {'Sí' if datos_extraidos['hay_documento_deuda'] else 'No'}")
 
         if datos_extraidos["datos_faltantes"]:
-            st.warning(
-                "Datos que conviene revisar o completar: "
-                + ", ".join(datos_extraidos["datos_faltantes"])
-            )
+            st.warning("Datos faltantes o dudosos: " + ", ".join(datos_extraidos["datos_faltantes"]))
         else:
-            st.success("El sistema ha detectado los datos principales.")
+            st.success("El sistema detecta los datos mínimos para iniciar el flujo.")
 
     st.divider()
 
-    st.header("✅ Validación humana de datos")
+    st.header("✅ Validación mínima antes de aplicar el flujo")
 
     datos = st.session_state.datos_extraidos or {
         "demandante": "",
         "demandado": "",
         "cuantia": 0.0,
-        "hay_documento_de_deuda": False,
+        "hay_documento_deuda": False,
         "menciona_monitorio": False,
         "peticion": "",
         "hechos_resumidos": "",
-        "datos_faltantes": []
+        "datos_faltantes": [],
+        "demanda_presentada_auto": True,
+        "tribunal_competente_auto": True,
+        "cumple_requisitos_auto": False,
+        "subsanacion_requerida_auto": True,
     }
 
-    with st.form("form_validacion"):
+    cumple_requisitos_auto = (
+        bool(datos.get("demandante"))
+        and bool(datos.get("demandado"))
+        and datos.get("cuantia", 0) > 0
+        and datos.get("hay_documento_deuda", False)
+    )
+
+    with st.form("validacion_auto"):
         c1, c2, c3 = st.columns(3)
 
         expediente = c1.text_input(
@@ -951,9 +876,9 @@ if pagina == "1. Subir demanda":
             step=1000.0
         )
 
-        st.subheader("Revisión inicial")
+        st.subheader("Resultado automático de la lectura inicial")
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
 
         demanda_presentada = c1.checkbox(
             "Demanda presentada",
@@ -966,45 +891,31 @@ if pagina == "1. Subir demanda":
         )
 
         cumple_requisitos = c3.checkbox(
-            "Cumple requisitos del monitorio",
-            value=bool(datos.get("hay_documento_de_deuda", False))
+            "Cumple requisitos básicos",
+            value=cumple_requisitos_auto
+        )
+
+        subsanacion_requerida = c4.checkbox(
+            "Requiere subsanación",
+            value=not cumple_requisitos_auto
         )
 
         st.caption(
-            "Para el MVP, se considera que cumple requisitos si contiene datos básicos y algún documento acreditativo de deuda. "
-            "Este punto debe validarlo una persona."
+            "Estos campos se rellenan automáticamente según la lectura del documento, "
+            "pero se pueden corregir manualmente."
         )
 
-        st.subheader("Subsanación")
-
-        c1, c2, c3 = st.columns(3)
-
-        subsanacion_requerida = c1.checkbox(
-            "Subsanación requerida",
-            value=not bool(datos.get("hay_documento_de_deuda", False))
-        )
-
-        demanda_subsanada = c2.checkbox(
-            "Demanda subsanada",
-            value=False
-        )
-
-        fecha_requerimiento_subsanacion = c3.date_input(
-            "Fecha requerimiento subsanación",
-            value=date.today()
-        )
-
-        st.subheader("Admisión y notificación")
+        st.subheader("Seguimiento procesal posterior")
 
         c1, c2, c3 = st.columns(3)
 
         demanda_admitida = c1.checkbox(
-            "Demanda admitida",
+            "Demanda ya admitida",
             value=False
         )
 
         deudor_notificado = c2.checkbox(
-            "Deudor notificado",
+            "Deudor ya notificado",
             value=False
         )
 
@@ -1012,8 +923,6 @@ if pagina == "1. Subir demanda":
             "Fecha notificación al deudor",
             value=date.today()
         )
-
-        st.subheader("Actuación del demandado")
 
         c1, c2, c3 = st.columns(3)
 
@@ -1032,12 +941,10 @@ if pagina == "1. Subir demanda":
             value=False
         )
 
-        st.subheader("Fase posterior a la oposición")
-
         c1, c2, c3 = st.columns(3)
 
         traslado_demandante = c1.checkbox(
-            "Se dio traslado al demandante",
+            "Traslado al demandante",
             value=False
         )
 
@@ -1051,19 +958,25 @@ if pagina == "1. Subir demanda":
             value=False
         )
 
-        peticion = st.text_area(
-            "Petición detectada o validada",
-            value=datos.get("peticion", ""),
-            height=100
+        c1, c2 = st.columns(2)
+
+        demanda_subsanada = c1.checkbox(
+            "Demanda subsanada",
+            value=False
+        )
+
+        fecha_requerimiento_subsanacion = c2.date_input(
+            "Fecha requerimiento subsanación",
+            value=date.today()
         )
 
         hechos_resumidos = st.text_area(
-            "Resumen de hechos",
+            "Resumen de hechos detectado",
             value=datos.get("hechos_resumidos", ""),
-            height=150
+            height=140
         )
 
-        guardar = st.form_submit_button("Guardar y evaluar expediente")
+        guardar = st.form_submit_button("Aplicar flujo y guardar expediente")
 
     if guardar:
         expediente_datos = {
@@ -1086,30 +999,26 @@ if pagina == "1. Subir demanda":
             "fecha_requerimiento_subsanacion": fecha_requerimiento_subsanacion,
             "fecha_notificacion_deudor": fecha_notificacion_deudor,
             "fecha_traslado_demandante": fecha_traslado_demandante,
-            "peticion": peticion,
             "hechos_resumidos": hechos_resumidos,
-            "texto_original": st.session_state.texto_subido
+            "texto_original": st.session_state.texto_subido,
         }
-
-        st.session_state.expedientes.append(expediente_datos)
 
         resultado = evaluar_expediente(expediente_datos)
         borrador = generar_borrador(expediente_datos, resultado)
 
-        st.success("Expediente guardado y evaluado correctamente.")
+        st.session_state.expedientes.append(expediente_datos)
 
-        st.subheader("Resultado del flujo")
+        st.success("Expediente guardado y evaluado.")
+
+        st.subheader("Resultado automático del flujo")
         c1, c2, c3 = st.columns(3)
         c1.metric("Estado", resultado["estado"])
         c2.metric("Riesgo", pintar_riesgo(resultado["riesgo"]))
-        c3.metric(
-            "Días restantes",
-            resultado["dias_restantes"] if resultado["dias_restantes"] is not None else "-"
-        )
+        c3.metric("Días restantes", resultado["dias_restantes"] if resultado["dias_restantes"] is not None else "-")
 
         st.write(f"**Artículo aplicable:** {resultado['articulo']}")
-        st.write(f"**Qué dice el artículo:** {resultado['resumen_articulo']}")
-        st.write(f"**Explicación del caso:** {resultado['explicacion']}")
+        st.write(f"**Resumen del artículo:** {resultado['resumen_articulo']}")
+        st.write(f"**Explicación aplicada al caso:** {resultado['explicacion']}")
         st.write(f"**Próxima actuación:** {resultado['accion']}")
 
         st.subheader("Borrador generado")
@@ -1124,7 +1033,7 @@ if pagina == "1. Subir demanda":
 
 
 # ============================================================
-# PANTALLA 2: DASHBOARD
+# DASHBOARD
 # ============================================================
 
 elif pagina == "2. Dashboard":
@@ -1145,40 +1054,36 @@ elif pagina == "2. Dashboard":
             "Vencimiento": res["fecha_vencimiento"] if res["fecha_vencimiento"] else "-",
             "Días restantes": res["dias_restantes"] if res["dias_restantes"] is not None else "-",
             "Riesgo": pintar_riesgo(res["riesgo"]),
-            "Próxima actuación": res["accion"]
+            "Próxima actuación": res["accion"],
         })
 
     df = pd.DataFrame(filas)
-
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    col1, col2, col3, col4 = st.columns(4)
-
     total = len(filas)
-    vencidos = sum(1 for fila in filas if "Vencido" in fila["Riesgo"])
-    alto = sum(1 for fila in filas if "Alto" in fila["Riesgo"])
-    oposiciones = sum(
-        1 for exp in st.session_state.expedientes
-        if exp.get("demandado_oposicion")
-    )
+    vencidos = sum(1 for f in filas if "Vencido" in f["Riesgo"])
+    alto = sum(1 for f in filas if "Alto" in f["Riesgo"])
+    oposiciones = sum(1 for exp in st.session_state.expedientes if exp.get("demandado_oposicion"))
 
-    col1.metric("Total expedientes", total)
-    col2.metric("Vencidos", vencidos)
-    col3.metric("Riesgo alto", alto)
-    col4.metric("Con oposición", oposiciones)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total expedientes", total)
+    c2.metric("Vencidos", vencidos)
+    c3.metric("Riesgo alto", alto)
+    c4.metric("Con oposición", oposiciones)
 
 
 # ============================================================
-# PANTALLA 3: DETALLE
+# DETALLE
 # ============================================================
 
 elif pagina == "3. Detalle de expediente":
     st.header("🔎 Detalle de expediente")
 
-    if not st.session_state.expedientes:
-        st.warning("No hay expedientes cargados.")
+    opciones = [exp["expediente"] for exp in st.session_state.expedientes]
+
+    if not opciones:
+        st.warning("No hay expedientes.")
     else:
-        opciones = [exp["expediente"] for exp in st.session_state.expedientes]
         seleccionado = st.selectbox("Selecciona expediente", opciones)
 
         exp = next(e for e in st.session_state.expedientes if e["expediente"] == seleccionado)
@@ -1188,40 +1093,35 @@ elif pagina == "3. Detalle de expediente":
         c1, c2, c3 = st.columns(3)
         c1.metric("Estado", res["estado"])
         c2.metric("Riesgo", pintar_riesgo(res["riesgo"]))
-        c3.metric(
-            "Días restantes",
-            res["dias_restantes"] if res["dias_restantes"] is not None else "-"
-        )
+        c3.metric("Días restantes", res["dias_restantes"] if res["dias_restantes"] is not None else "-")
 
-        st.subheader("Datos principales")
+        st.subheader("Datos del expediente")
+        st.json({
+            "expediente": exp["expediente"],
+            "demandante": exp["demandante"],
+            "demandado": exp["demandado"],
+            "cuantia": exp["cuantia"],
+            "demanda_presentada": exp["demanda_presentada"],
+            "cumple_requisitos": exp["cumple_requisitos"],
+            "demanda_admitida": exp["demanda_admitida"],
+            "deudor_notificado": exp["deudor_notificado"],
+            "demandado_pago": exp["demandado_pago"],
+            "demandado_oposicion": exp["demandado_oposicion"],
+        })
 
-        datos_tabla = {
-            "Expediente": exp["expediente"],
-            "Demandante": exp["demandante"],
-            "Demandado": exp["demandado"],
-            "Cuantía": f"{exp['cuantia']:,.2f} lempiras",
-            "Fecha notificación deudor": str(exp["fecha_notificacion_deudor"]),
-            "Fecha traslado demandante": str(exp["fecha_traslado_demandante"])
-        }
-
-        st.json(datos_tabla)
-
-        st.subheader("Evaluación jurídica")
+        st.subheader("Evaluación procesal")
         st.write(f"**Estado:** {res['estado']}")
-        st.write(f"**Artículo aplicable:** {res['articulo']}")
-        st.write(f"**Resumen del artículo:** {res['resumen_articulo']}")
-        st.write(f"**Explicación aplicada al caso:** {res['explicacion']}")
+        st.write(f"**Artículo:** {res['articulo']}")
+        st.write(f"**Resumen artículo:** {res['resumen_articulo']}")
+        st.write(f"**Explicación:** {res['explicacion']}")
         st.write(f"**Próxima actuación:** {res['accion']}")
-
-        if res["fecha_vencimiento"]:
-            st.write(f"**Fecha de vencimiento:** {res['fecha_vencimiento']}")
 
         if exp.get("hechos_resumidos"):
             st.subheader("Hechos resumidos")
             st.write(exp["hechos_resumidos"])
 
         st.subheader("Borrador generado")
-        st.text_area("Borrador revisable", borrador, height=450)
+        st.text_area("Borrador", borrador, height=450)
 
         st.download_button(
             "Descargar borrador TXT",
@@ -1232,104 +1132,55 @@ elif pagina == "3. Detalle de expediente":
 
 
 # ============================================================
-# PANTALLA 4: MAPA DE REGLAS
+# MAPA DE REGLAS
 # ============================================================
 
 elif pagina == "4. Mapa de reglas":
-    st.header("🧠 Mapa de reglas procesales")
+    st.header("🧠 Mapa de reglas")
 
     st.markdown(
         """
-        ## Flujo lógico del proceso monitorio
+        ### Flujo lógico usado por el sistema
 
-        ### 1. Presentación de demanda
-        Si no existe demanda, el proceso no se inicia.
-
-        ### 2. Examen de competencia
-        Si el tribunal no es competente, se rechaza de plano y se remite al tribunal competente.
-
-        ### 3. Revisión de requisitos
-        Si la demanda no cumple requisitos, se requiere subsanación en cinco días.
-        Si no se subsana, se archiva definitivamente.
-
-        ### 4. Admisión y requerimiento
-        Si la demanda cumple requisitos, se admite y se requiere al deudor para que pague u oponga en veinte días.
-
-        ### 5. Respuesta del deudor
-        El deudor puede:
-        - pagar;
-        - oponerse;
-        - no pagar ni comparecer.
-
-        ### 6. Si paga
-        Se entrega comprobante y se archiva.
-
-        ### 7. Si no paga ni se opone
-        Vencido el plazo, procede ejecución por vía de apremio.
-
-        ### 8. Si se opone
-        Se da traslado al demandante y se determina el procedimiento por cuantía.
-
-        ### 9. Cuantía
-        - Si no excede de 50.000 lempiras: procedimiento abreviado.
-        - Si excede de 50.000 lempiras: procedimiento ordinario.
-
-        ### 10. Falta de demanda posterior
-        Si tras la oposición no se presenta la demanda correspondiente en plazo, procede sobreseimiento.
+        1. Lee la demanda.
+        2. Extrae demandante, demandado, cuantía y documentos de deuda.
+        3. Decide si la demanda parece completa o requiere subsanación.
+        4. Si está completa, propone admisión y requerimiento al deudor.
+        5. Si el deudor paga, archiva.
+        6. Si no paga ni se opone en 20 días, propone ejecución.
+        7. Si se opone, decide abreviado u ordinario según cuantía.
         """
     )
 
-    st.subheader("Reglas simplificadas en pseudocódigo")
-
     st.code(
         """
-if not demanda_presentada:
-    estado = "Sin demanda presentada"
-
-elif not tribunal_competente:
-    estado = "Rechazo por falta de competencia"
+if demanda_presentada and tribunal_competente and cumple_requisitos:
+    if not demanda_admitida:
+        estado = "Demanda lista para admisión"
 
 elif not cumple_requisitos:
-    estado = "Subsanación pendiente"
-    plazo = 5
-
-elif cumple_requisitos and not demanda_admitida:
-    estado = "Demanda lista para admisión"
-
-elif demanda_admitida and not deudor_notificado:
-    estado = "Pendiente de notificación al deudor"
-
-elif deudor_notificado and demandado_pago:
-    estado = "Pago realizado y archivo"
+    estado = "Requerir subsanación"
 
 elif deudor_notificado and not pago and not oposicion and plazo_20_dias_vencido:
     estado = "Ejecución por vía de apremio"
 
-elif demandado_oposicion and cuantia <= 50000:
+elif oposicion and cuantia <= 50000:
     estado = "Procedimiento abreviado"
 
-elif demandado_oposicion and cuantia > 50000:
+elif oposicion and cuantia > 50000:
     estado = "Procedimiento ordinario"
-
-elif oposicion and cuantia > 50000 and no_demanda_ordinaria_en_plazo:
-    estado = "Sobreseimiento"
         """,
         language="python"
     )
 
-    st.subheader("Artículos cargados en el sistema")
-
-    tabla_articulos = []
+    st.subheader("Artículos usados")
+    tabla = []
 
     for clave, valor in ARTICULOS.items():
-        tabla_articulos.append({
+        tabla.append({
             "Regla": clave,
             "Referencia": valor["referencia"],
-            "Resumen operativo": valor["resumen"]
+            "Resumen": valor["resumen"]
         })
 
-    st.dataframe(
-        pd.DataFrame(tabla_articulos),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(pd.DataFrame(tabla), use_container_width=True, hide_index=True)
