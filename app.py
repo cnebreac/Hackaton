@@ -976,6 +976,7 @@ def pantalla_perfiles():
         unsafe_allow_html=True
     )
 
+    # MENSAJE DE DEUDA EN LA SEGUNDA VENTANA
     if tiene_deudas:
         codigos = ", ".join(deudas["codigo"].astype(str).tolist())
 
@@ -989,6 +990,9 @@ def pantalla_perfiles():
             """,
             unsafe_allow_html=True
         )
+
+        primer_registro = deudas.iloc[0].to_dict()
+        st.session_state.registro_demandado = primer_registro
 
     margen_izq, col1, col2, margen_der = st.columns([0.35, 1, 1, 0.35], gap="large")
 
@@ -1318,18 +1322,6 @@ def pantalla_demandado():
     )
 
     registro_precargado = st.session_state.get("registro_demandado")
-
-    if registro_precargado:
-        st.markdown(
-            f"""
-            <div class="debt-alert">
-                Se ha detectado una deuda pendiente asociada a tu nombre.
-                <br>
-                Código de deuda: <b>{registro_precargado.get('codigo', '')}</b>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 
     codigo_default = registro_precargado.get("codigo", "") if registro_precargado else ""
 
