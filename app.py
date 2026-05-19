@@ -30,7 +30,7 @@ except ImportError:
 
 st.set_page_config(
     page_title="LexMonitor AI",
-    page_icon="⚖️",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -56,7 +56,7 @@ HEADERS = [
 
 
 # ============================================================
-# ESTILOS
+# ESTILOS INSTITUCIONALES
 # ============================================================
 
 st.markdown(
@@ -71,146 +71,141 @@ st.markdown(
     }
 
     .block-container {
-        padding-top: 0.8rem;
-        padding-left: 2.5rem;
-        padding-right: 2.5rem;
+        padding-top: 1.5rem;
+        padding-left: 3rem;
+        padding-right: 3rem;
         max-width: 1280px;
     }
 
     .main {
-        background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+        background: #f3f4f6;
     }
 
-    .topbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.8rem;
+    .institutional-header {
+        background: #003366;
+        color: white;
+        padding: 1.1rem 1.5rem;
+        border-bottom: 5px solid #f2c94c;
+        margin-bottom: 1rem;
     }
 
-    .topbar-title {
-        font-size: 1.1rem;
+    .institutional-title {
+        color: white;
+        font-size: 1.15rem;
         font-weight: 800;
-        color: #111827;
+        margin-bottom: 0.2rem;
     }
 
-    .topbar-user {
-        font-size: 0.95rem;
-        color: #6b7280;
+    .institutional-user {
+        color: #e5e7eb;
+        font-size: 0.9rem;
     }
 
     .login-wrapper {
         max-width: 520px;
-        margin: 3rem auto 1.2rem auto;
-        padding: 2.5rem 2.8rem;
+        margin: 4rem auto 1.2rem auto;
+        padding: 2.4rem 2.6rem;
         background: white;
-        border-radius: 30px;
-        box-shadow: 0 25px 70px rgba(15, 23, 42, 0.15);
-        border: 1px solid #e5e7eb;
-        text-align: center;
+        border-radius: 4px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        border: 1px solid #d1d5db;
+        text-align: left;
     }
 
-    .login-icon {
-        width: 82px;
-        height: 82px;
-        margin: 0 auto 1rem auto;
-        border-radius: 50%;
-        background: #1e3a8a;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 38px;
-        font-weight: bold;
+    .login-header {
+        border-bottom: 1px solid #d1d5db;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
     }
 
     .login-badge {
         display: inline-block;
-        background: #eff6ff;
-        color: #1d4ed8;
-        padding: 0.4rem 0.9rem;
-        border-radius: 999px;
-        font-size: 0.82rem;
+        background: #e5eef7;
+        color: #003366;
+        padding: 0.35rem 0.75rem;
+        border-radius: 2px;
+        font-size: 0.78rem;
         font-weight: 700;
-        margin-bottom: 1rem;
+        margin-bottom: 0.8rem;
+        text-transform: uppercase;
     }
 
     .login-title {
-        font-size: 2rem;
-        font-weight: 850;
+        font-size: 1.65rem;
+        font-weight: 800;
         color: #111827;
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.25rem;
     }
 
     .login-subtitle {
-        font-size: 1rem;
-        color: #6b7280;
-        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+        color: #4b5563;
+        margin-bottom: 0;
+    }
+
+    .home-spacer {
+        height: 4.5rem;
     }
 
     .selection-title {
         text-align: center;
-        font-size: 2rem;
-        font-weight: 850;
+        font-size: 1.85rem;
+        font-weight: 800;
         color: #111827;
-        margin-top: 1.5rem;
-        margin-bottom: 0.45rem;
+        margin-bottom: 0.5rem;
     }
 
     .selection-subtitle {
         text-align: center;
-        color: #6b7280;
-        margin-bottom: 2rem;
+        color: #4b5563;
+        margin-bottom: 2.4rem;
         font-size: 1rem;
     }
 
     .role-card {
-        padding: 2.2rem 1.8rem;
-        border-radius: 24px;
+        padding: 2rem 1.7rem;
+        border-radius: 4px;
         background: #ffffff;
-        border: 1px solid #dbe3ef;
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
-        text-align: center;
-        min-height: 215px;
-        margin-bottom: 0.8rem;
+        border: 1px solid #cbd5e1;
+        box-shadow: none;
+        text-align: left;
+        min-height: 190px;
+        margin-bottom: 0.9rem;
+        border-top: 5px solid #003366;
     }
 
     .role-card-debt {
-        padding: 2.2rem 1.8rem;
-        border-radius: 24px;
-        background: #fff7ed;
-        border: 2px solid #f97316;
-        box-shadow: 0 16px 40px rgba(249, 115, 22, 0.16);
-        text-align: center;
-        min-height: 215px;
-        margin-bottom: 0.8rem;
-    }
-
-    .role-icon {
-        font-size: 2.5rem;
-        margin-bottom: 0.85rem;
+        padding: 2rem 1.7rem;
+        border-radius: 4px;
+        background: #fffdf5;
+        border: 1px solid #d97706;
+        box-shadow: none;
+        text-align: left;
+        min-height: 190px;
+        margin-bottom: 0.9rem;
+        border-top: 5px solid #d97706;
     }
 
     .role-title {
-        font-size: 1.5rem;
-        font-weight: 850;
+        font-size: 1.35rem;
+        font-weight: 800;
         color: #111827;
-        margin-bottom: 0.6rem;
+        margin-bottom: 0.7rem;
     }
 
     .role-text {
-        font-size: 1rem;
-        color: #6b7280;
-        line-height: 1.5;
+        font-size: 0.98rem;
+        color: #4b5563;
+        line-height: 1.55;
     }
 
     .debt-alert {
         background: #fff7ed;
-        border: 1px solid #fdba74;
-        border-left: 6px solid #f97316;
-        border-radius: 18px;
+        border: 1px solid #d97706;
+        border-left: 6px solid #d97706;
+        border-radius: 4px;
         padding: 1rem 1.3rem;
-        margin: 0 auto 1.8rem auto;
+        margin: 0 auto 2rem auto;
         color: #7c2d12;
         font-weight: 650;
         max-width: 980px;
@@ -218,49 +213,70 @@ st.markdown(
 
     .panel {
         background: white;
-        border-radius: 22px;
-        padding: 1.6rem;
-        border: 1px solid #e5e7eb;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+        border-radius: 4px;
+        padding: 1.4rem;
+        border: 1px solid #cbd5e1;
+        box-shadow: none;
         margin-bottom: 1.2rem;
     }
 
     .status-box {
-        background: #f8fafc;
-        border-left: 5px solid #1d4ed8;
+        background: #eef2f7;
+        border-left: 5px solid #003366;
         padding: 1rem 1.2rem;
-        border-radius: 14px;
+        border-radius: 4px;
         margin-bottom: 1rem;
+        color: #1f2937;
     }
 
     .success-box {
         background: #ecfdf5;
-        border-left: 5px solid #059669;
+        border-left: 5px solid #047857;
         padding: 1rem 1.2rem;
-        border-radius: 14px;
+        border-radius: 4px;
         margin-bottom: 1rem;
+        color: #064e3b;
     }
 
     .warning-box {
         background: #fffbeb;
-        border-left: 5px solid #d97706;
+        border-left: 5px solid #b45309;
         padding: 1rem 1.2rem;
-        border-radius: 14px;
+        border-radius: 4px;
         margin-bottom: 1rem;
+        color: #78350f;
     }
 
     div.stButton > button {
-        border-radius: 13px;
-        font-weight: 750;
-        padding: 0.78rem 1rem;
-        min-height: 48px;
+        border-radius: 3px;
+        font-weight: 700;
+        padding: 0.75rem 1rem;
+        min-height: 46px;
+        border: 1px solid #003366;
+        background-color: #003366;
+        color: white;
+    }
+
+    div.stButton > button:hover {
+        background-color: #00264d;
+        color: white;
+        border: 1px solid #00264d;
     }
 
     div[data-testid="stFileUploader"] {
-        background: #f9fafb;
-        border: 1px dashed #cbd5e1;
-        border-radius: 16px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
         padding: 1rem;
+    }
+
+    h1, h2, h3 {
+        color: #111827;
+    }
+
+    label {
+        color: #111827 !important;
+        font-weight: 600 !important;
     }
     </style>
     """,
@@ -798,11 +814,12 @@ def pantalla_login():
     st.markdown(
         """
         <div class="login-wrapper">
-            <div class="login-icon">⚖️</div>
-            <div class="login-badge">Acceso seguro</div>
-            <div class="login-title">LexMonitor AI</div>
-            <div class="login-subtitle">
-                Identificación mediante certificado digital
+            <div class="login-header">
+                <div class="login-badge">Sede electrónica</div>
+                <div class="login-title">LexMonitor AI</div>
+                <div class="login-subtitle">
+                    Acceso mediante identificación digital
+                </div>
             </div>
         </div>
         """,
@@ -841,23 +858,23 @@ def pantalla_login():
 # ============================================================
 
 def topbar():
-    col1, col2 = st.columns([8, 1.5])
+    col1, col2 = st.columns([6, 2])
 
     with col1:
         st.markdown(
             f"""
-            <div class="topbar">
-                <div>
-                    <div class="topbar-title">LexMonitor AI</div>
-                    <div class="topbar-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
-                </div>
+            <div class="institutional-header">
+                <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
+                <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
             </div>
             """,
             unsafe_allow_html=True
         )
 
     with col2:
-        if st.button("Cerrar sesión", use_container_width=True):
+        st.write("")
+        st.write("")
+        if st.button("Cerrar sesión", use_container_width=True, key="btn_cerrar_sesion"):
             st.session_state.autenticado = False
             st.session_state.perfil = None
             st.session_state.usuario_nombre = ""
@@ -867,12 +884,14 @@ def topbar():
 
 
 # ============================================================
-# PANTALLA PRINCIPAL DEMANDANTE / DEMANDADO
+# PANTALLA PRINCIPAL
 # ============================================================
 
 def pantalla_perfiles():
     deudas = buscar_deudas_por_nombre(st.session_state.usuario_nombre)
     tiene_deudas = not deudas.empty
+
+    st.markdown('<div class="home-spacer"></div>', unsafe_allow_html=True)
 
     st.markdown(
         """
@@ -902,10 +921,10 @@ def pantalla_perfiles():
         st.markdown(
             """
             <div class="role-card">
-                <div class="role-icon">📄</div>
                 <div class="role-title">Demandante / Acreedor</div>
                 <div class="role-text">
-                    Presentar una solicitud monitoria y aportar documentación.
+                    Presentar una solicitud monitoria, aportar la documentación acreditativa
+                    y generar el código de expediente.
                 </div>
             </div>
             """,
@@ -922,13 +941,12 @@ def pantalla_perfiles():
         texto = (
             "Tienes una reclamación pendiente. Consulta el expediente y selecciona una actuación."
             if tiene_deudas
-            else "Consultar una reclamación mediante código y responder."
+            else "Consultar una reclamación mediante código y responder a la solicitud recibida."
         )
 
         st.markdown(
             f"""
             <div class="{clase}">
-                <div class="role-icon">💼</div>
                 <div class="role-title">Demandado / Deudor</div>
                 <div class="role-text">
                     {texto}
@@ -955,7 +973,7 @@ def pantalla_perfiles():
 def pantalla_demandante():
     topbar()
 
-    if st.button("← Volver", use_container_width=False):
+    if st.button("Volver", use_container_width=False, key="volver_demandante"):
         st.session_state.perfil = None
         st.rerun()
 
@@ -1190,7 +1208,7 @@ def pantalla_demandante():
 def pantalla_demandado():
     topbar()
 
-    if st.button("← Volver", use_container_width=False):
+    if st.button("Volver", use_container_width=False, key="volver_demandado"):
         st.session_state.perfil = None
         st.session_state.registro_demandado = None
         st.rerun()
