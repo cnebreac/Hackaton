@@ -345,9 +345,6 @@ def cerrar_sesion():
 
     st.rerun()
 
-
-if "logout" in st.query_params:
-    cerrar_sesion()
 # ============================================================
 # UTILIDADES
 # ============================================================
@@ -902,23 +899,33 @@ def pantalla_login():
 # ============================================================
 
 def topbar():
-    st.markdown(
-        f"""
-        <div class="institutional-header">
-            <div class="institutional-header-left">
-                <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
-                <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
-            </div>
+    col1, col2 = st.columns([8, 1.4], vertical_alignment="center")
 
-            <div>
-                <a class="logout-header-link" href="?logout=1" target="_self">
-                    Cerrar sesión
-                </a>
+    with col1:
+        st.markdown(
+            f"""
+            <div class="institutional-header">
+                <div class="institutional-header-left">
+                    <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
+                    <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+            """,
+            unsafe_allow_html=True
+        )
+
+    with col2:
+        st.markdown('<div class="logout-soft">', unsafe_allow_html=True)
+
+        if st.button("Cerrar sesión", key="btn_cerrar_sesion_header", use_container_width=True):
+            st.session_state.autenticado = False
+            st.session_state.perfil = None
+            st.session_state.usuario_nombre = ""
+            st.session_state.registro_demandado = None
+            st.session_state.mostrar_oposicion = False
+            st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ============================================================
