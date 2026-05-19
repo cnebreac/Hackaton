@@ -1251,29 +1251,10 @@ def pantalla_demandado():
 
     st.markdown('<div class="form-page-title">Zona del Demandado / Deudor</div>', unsafe_allow_html=True)
 
-    registro_precargado = st.session_state.get("registro_demandado")
-    codigo_default = registro_precargado.get("codigo", "") if registro_precargado else ""
-
-    codigo = st.text_input(
-        "Código de demanda",
-        value=codigo_default,
-        placeholder="Ejemplo: MON-2026-ABC123"
-    )
-
-    buscar = st.button("Buscar reclamación", use_container_width=True)
-
-    if buscar and codigo:
-        registro = buscar_por_codigo(codigo.strip())
-
-        if registro is None:
-            st.error("No se ha encontrado ninguna reclamación con ese código.")
-            return
-
-        st.session_state.registro_demandado = registro
-
     registro = st.session_state.get("registro_demandado")
 
     if not registro:
+        st.error("No se ha encontrado ninguna reclamación asociada a esta sesión.")
         return
 
     st.markdown('<div class="form-section-title">Resumen de la reclamación</div>', unsafe_allow_html=True)
