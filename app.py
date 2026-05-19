@@ -36,6 +36,7 @@ st.set_page_config(
 )
 
 CSV_LOCAL = "expedientes_lexmonitor.csv"
+MIN_DOCUMENTOS_ACREDITATIVOS = 1
 
 HEADERS = [
     "codigo",
@@ -81,7 +82,7 @@ st.markdown(
         background: #f3f4f6;
     }
 
-    /* CABECERA INSTITUCIONAL A TODO EL ANCHO */
+    /* CABECERA INSTITUCIONAL */
     .institutional-header {
         background: #003366;
         color: white;
@@ -98,9 +99,9 @@ st.markdown(
 
     .institutional-title {
         color: white;
-        font-size: 1.35rem;
+        font-size: 1.55rem;
         font-weight: 800;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.35rem;
     }
 
     .institutional-user {
@@ -108,7 +109,7 @@ st.markdown(
         font-size: 0.92rem;
     }
 
-    /* BOTÓN CERRAR SESIÓN AL FINAL DE LA WEB */
+    /* BOTÓN CERRAR SESIÓN AL FINAL */
     .logout-bottom-container {
         display: flex;
         justify-content: flex-end;
@@ -244,6 +245,42 @@ st.markdown(
         color: #7c2d12;
         font-weight: 650;
         max-width: 980px;
+    }
+
+    /* PÁGINAS DE FORMULARIO */
+    .form-page-title {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #111827;
+        margin-bottom: 1.2rem;
+    }
+
+    .form-section-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #111827;
+        margin-top: 1.4rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .summary-card {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        padding: 1.3rem 1.5rem;
+        margin-top: 1rem;
+        margin-bottom: 1.2rem;
+    }
+
+    .summary-row {
+        margin-bottom: 0.55rem;
+        color: #1f2937;
+        font-size: 0.96rem;
+    }
+
+    .summary-label {
+        font-weight: 800;
+        color: #111827;
     }
 
     /* PANELES */
@@ -772,7 +809,7 @@ Código de expediente: {registro['codigo']}
 
 Visto el escrito presentado por {registro['demandante']} frente a {registro['demandado']}, por importe de {registro['cuantia']} euros, y examinada la documentación aportada, se aprecia inicialmente que la solicitud contiene los datos básicos necesarios y documentación acreditativa de la deuda.
 
-Documentación detectada:
+Documentación aportada:
 {registro['categoria_art_812']}
 
 En consecuencia, procede admitir la solicitud monitoria y requerir al deudor para que pague la cantidad reclamada o formule oposición en el plazo legalmente previsto.
@@ -1015,7 +1052,12 @@ def pantalla_demandante():
         st.session_state.perfil = None
         st.rerun()
 
-    st.title("Zona del Demandante / Acreedor")
+    st.markdown(
+        """
+        <div class="form-page-title">Zona del Demandante / Acreedor</div>
+        """,
+        unsafe_allow_html=True
+    )
 
     modo = st.radio(
         "Elige cómo quieres presentar la solicitud",
@@ -1027,7 +1069,6 @@ def pantalla_demandante():
     )
 
     texto_demanda = ""
-    texto_documentos = ""
 
     datos_manual = {
         "demandante": st.session_state.usuario_nombre,
@@ -1036,11 +1077,16 @@ def pantalla_demandante():
         "concepto_deuda": ""
     }
 
-    if modo == "Subir PDF/DOCX/TXT de plantilla rellena":
-        st.subheader("1. Subir solicitud monitoria")
+    st.markdown(
+        """
+        <div class="form-section-title">Solicitud monitoria</div>
+        """,
+        unsafe_allow_html=True
+    )
 
+    if modo == "Subir PDF/DOCX/TXT de plantilla rellena":
         demanda_file = st.file_uploader(
-            "Sube la demanda o solicitud principal",
+            "Sube la solicitud monitoria principal",
             type=["pdf", "docx", "txt"],
             key="demanda_principal",
             accept_multiple_files=False
@@ -1049,12 +1095,7 @@ def pantalla_demandante():
         if demanda_file is not None:
             texto_demanda = leer_documento(demanda_file)
 
-            with st.expander("Ver texto leído de la solicitud"):
-                st.text_area("Texto detectado", texto_demanda, height=220)
-
     else:
-        st.subheader("1. Rellenar formulario de solicitud monitoria")
-
         c1, c2 = st.columns(2)
 
         datos_manual["demandante"] = c1.text_input(
@@ -1085,30 +1126,22 @@ def pantalla_demandante():
         Solicito la tramitación de proceso monitorio.
         """
 
-    st.subheader("2. Subir documentos acreditativos")
+    st.markdown(
+        """
+        <div class="form-section-title">Documentos acreditativos</div>
+        """,
+        unsafe_allow_html=True
+    )
 
     documentos_files = st.file_uploader(
-        "Sube facturas, albaranes, certificaciones, documentos firmados o documentos comerciales",
+        f"Sube los documentos acreditativos necesarios. Mínimo requerido: {MIN_DOCUMENTOS_ACREDITATIVOS}",
         type=["pdf", "docx", "txt"],
         accept_multiple_files=True,
         key="documentos_acreditativos"
     )
 
-    if documentos_files:
-        textos_docs = []
-
-        for doc_file in documentos_files:
-            texto_doc = leer_documento(doc_file)
-            textos_docs.append(
-                f"\n\n--- DOCUMENTO ACREDITATIVO: {doc_file.name} ---\n{texto_doc}"
-            )
-
-        texto_documentos = "\n".join(textos_docs)
-
-        with st.expander("Ver texto leído de los documentos"):
-            st.text_area("Documentos detectados", texto_documentos, height=220)
-
-    st.subheader("3. Comprobación y generación de código")
+    numero_documentos = len(documentos_files) if documentos_files else 0
+    documentos_validos = numero_documentos >= MIN_DOCUMENTOS_ACREDITATIVOS
 
     if modo == "Rellenar formulario desde la app":
         datos_extraidos = {
@@ -1116,107 +1149,128 @@ def pantalla_demandante():
             "demandado": datos_manual["demandado"],
             "cuantia": datos_manual["cuantia"],
             "concepto_deuda": datos_manual["concepto_deuda"],
+            "hay_documento_deuda": documentos_validos,
+            "documentos_art_812": {},
+            "categoria_art_812": f"{numero_documentos} documento(s) acreditativo(s) aportado(s)",
+            "datos_faltantes": [],
+            "cumple_requisitos_auto": False
         }
 
-        hay_doc, documentos_art_812 = detectar_documentos_art_812(texto_documentos)
+        if not datos_extraidos["demandante"]:
+            datos_extraidos["datos_faltantes"].append("Demandante / acreedor")
 
-        datos_extraidos["hay_documento_deuda"] = hay_doc
-        datos_extraidos["documentos_art_812"] = documentos_art_812
-        datos_extraidos["categoria_art_812"] = categorias_detectadas_texto(documentos_art_812)
+        if not datos_extraidos["demandado"]:
+            datos_extraidos["datos_faltantes"].append("Demandado / deudor")
+
+        if datos_extraidos["cuantia"] <= 0:
+            datos_extraidos["datos_faltantes"].append("Cuantía")
+
+        if not documentos_validos:
+            datos_extraidos["datos_faltantes"].append("Documentos acreditativos suficientes")
+
+        datos_extraidos["cumple_requisitos_auto"] = len(datos_extraidos["datos_faltantes"]) == 0
+
+    else:
+        datos_extraidos = extraer_datos_demanda(texto_demanda, "")
+
+        datos_extraidos["hay_documento_deuda"] = documentos_validos
+        datos_extraidos["documentos_art_812"] = {}
+        datos_extraidos["categoria_art_812"] = f"{numero_documentos} documento(s) acreditativo(s) aportado(s)"
 
         datos_faltantes = []
+
         if not datos_extraidos["demandante"]:
             datos_faltantes.append("Demandante / acreedor")
+
         if not datos_extraidos["demandado"]:
             datos_faltantes.append("Demandado / deudor")
+
         if datos_extraidos["cuantia"] <= 0:
             datos_faltantes.append("Cuantía")
-        if not hay_doc:
-            datos_faltantes.append("Documentación acreditativa art. 812 LEC")
+
+        if not documentos_validos:
+            datos_faltantes.append("Documentos acreditativos suficientes")
 
         datos_extraidos["datos_faltantes"] = datos_faltantes
         datos_extraidos["cumple_requisitos_auto"] = len(datos_faltantes) == 0
 
-    else:
-        datos_extraidos = extraer_datos_demanda(texto_demanda, texto_documentos)
+    st.markdown(
+        """
+        <div class="form-section-title">Resumen de la demanda</div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric("Demandante", datos_extraidos["demandante"] or "No detectado")
-    c2.metric("Demandado", datos_extraidos["demandado"] or "No detectado")
-    c3.metric("Cuantía", f"{float(datos_extraidos['cuantia']):,.2f} €")
-
-    if datos_extraidos["hay_documento_deuda"]:
-        st.markdown(
-            """
-            <div class="success-box">
-                Documentación acreditativa detectada.
+    st.markdown(
+        f"""
+        <div class="summary-card">
+            <div class="summary-row">
+                <span class="summary-label">Demandante / acreedor:</span>
+                {datos_extraidos["demandante"] or "No detectado"}
             </div>
-            """,
-            unsafe_allow_html=True
-        )
-    else:
-        st.markdown(
-            """
-            <div class="warning-box">
-                No se ha detectado documentación acreditativa suficiente.
+            <div class="summary-row">
+                <span class="summary-label">Demandado / deudor:</span>
+                {datos_extraidos["demandado"] or "No detectado"}
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+            <div class="summary-row">
+                <span class="summary-label">Cuantía reclamada:</span>
+                {float(datos_extraidos["cuantia"]):,.2f} €
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Concepto de la deuda:</span>
+                {datos_extraidos.get("concepto_deuda", "") or "No detectado"}
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Documentos acreditativos aportados:</span>
+                {numero_documentos}
+            </div>
+            <div class="summary-row">
+                <span class="summary-label">Mínimo requerido:</span>
+                {MIN_DOCUMENTOS_ACREDITATIVOS}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    with st.expander("Ver categorías documentales detectadas"):
-        docs_812 = datos_extraidos.get("documentos_art_812", {})
-        for categoria, coincidencias in docs_812.items():
-            if coincidencias:
-                st.success(f"{categoria}: {', '.join(coincidencias)}")
-            else:
-                st.info(f"{categoria}: no detectado")
+    if documentos_validos:
+        st.success("Documentos acreditativos válidos: se ha aportado el número mínimo requerido.")
+    else:
+        st.error(
+            f"Faltan documentos acreditativos. Se requiere un mínimo de "
+            f"{MIN_DOCUMENTOS_ACREDITATIVOS} documento(s). Actualmente hay {numero_documentos}."
+        )
 
     if datos_extraidos["datos_faltantes"]:
-        st.warning("Datos pendientes: " + ", ".join(datos_extraidos["datos_faltantes"]))
+        st.error("Faltan datos necesarios: " + ", ".join(datos_extraidos["datos_faltantes"]))
 
     generar = st.button(
         "Generar código de demanda",
         use_container_width=True,
-        disabled=not bool(datos_extraidos["demandante"]) or not bool(datos_extraidos["demandado"])
+        disabled=not datos_extraidos["cumple_requisitos_auto"]
     )
 
     if generar:
         codigo = generar_codigo()
-        cumple = datos_extraidos["cumple_requisitos_auto"]
-
-        if cumple:
-            estado = "Pendiente de respuesta del deudor"
-            accion = "Requerir al deudor para pagar u oponerse"
-            documentacion_detectada = "Sí"
-        else:
-            estado = "Pendiente de subsanación"
-            accion = "Requerir subsanación documental"
-            documentacion_detectada = "No"
 
         registro = {
             "codigo": codigo,
             "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "estado": estado,
+            "estado": "Pendiente de respuesta del deudor",
             "demandante": datos_extraidos["demandante"],
             "demandado": datos_extraidos["demandado"],
             "cuantia": str(datos_extraidos["cuantia"]),
             "concepto_deuda": datos_extraidos.get("concepto_deuda", ""),
-            "documentacion_detectada": documentacion_detectada,
+            "documentacion_detectada": "Sí",
             "categoria_art_812": datos_extraidos.get("categoria_art_812", ""),
             "respuesta_deudor": "",
             "fecha_respuesta": "",
             "motivo_oposicion": "",
-            "accion_recomendada": accion,
+            "accion_recomendada": "Requerir al deudor para pagar u oponerse",
             "borrador": ""
         }
 
-        if cumple:
-            borrador = generar_borrador_admision(registro)
-        else:
-            borrador = generar_borrador_subsanacion(registro)
-
+        borrador = generar_borrador_admision(registro)
         registro["borrador"] = borrador
 
         destino = guardar_registro(registro)
@@ -1228,8 +1282,14 @@ def pantalla_demandante():
         else:
             st.info("Registro guardado en CSV local.")
 
-        st.subheader("Borrador generado")
-        st.text_area("Borrador", borrador, height=330)
+        st.markdown(
+            """
+            <div class="form-section-title">Borrador generado</div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.text_area("Borrador", borrador, height=300)
 
         st.download_button(
             "Descargar borrador",
@@ -1251,7 +1311,12 @@ def pantalla_demandado():
         st.session_state.registro_demandado = None
         st.rerun()
 
-    st.title("Zona del Demandado / Deudor")
+    st.markdown(
+        """
+        <div class="form-page-title">Zona del Demandado / Deudor</div>
+        """,
+        unsafe_allow_html=True
+    )
 
     registro_precargado = st.session_state.get("registro_demandado")
 
@@ -1291,7 +1356,12 @@ def pantalla_demandado():
     if not registro:
         return
 
-    st.subheader("Resumen de la reclamación")
+    st.markdown(
+        """
+        <div class="form-section-title">Resumen de la reclamación</div>
+        """,
+        unsafe_allow_html=True
+    )
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Código", registro.get("codigo", ""))
@@ -1311,7 +1381,12 @@ def pantalla_demandado():
         unsafe_allow_html=True
     )
 
-    st.subheader("Selecciona una actuación")
+    st.markdown(
+        """
+        <div class="form-section-title">Selecciona una actuación</div>
+        """,
+        unsafe_allow_html=True
+    )
 
     col1, col2, col3 = st.columns(3)
 
@@ -1356,7 +1431,12 @@ def pantalla_demandado():
             st.text_area("Borrador generado", borrador, height=300)
 
     if st.session_state.get("mostrar_oposicion", False):
-        st.subheader("Formulario de oposición")
+        st.markdown(
+            """
+            <div class="form-section-title">Formulario de oposición</div>
+            """,
+            unsafe_allow_html=True
+        )
 
         with st.form("form_oposicion"):
             motivo = st.text_area(
