@@ -56,7 +56,7 @@ HEADERS = [
 
 
 # ============================================================
-# ESTILOS INSTITUCIONALES
+# ESTILOS
 # ============================================================
 
 st.markdown(
@@ -81,52 +81,57 @@ st.markdown(
         background: #f3f4f6;
     }
 
-    /* CABECERA INSTITUCIONAL */
+    /* CABECERA INSTITUCIONAL A TODO EL ANCHO */
     .institutional-header {
         background: #003366;
         color: white;
-        padding: 1.15rem 1.5rem;
+        padding: 1.35rem 1.7rem;
         border-bottom: 5px solid #f2c94c;
-        margin-bottom: 1.2rem;
-        min-height: 92px;
+        margin-bottom: 1.6rem;
+        min-height: 95px;
         display: flex;
         flex-direction: column;
         justify-content: center;
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .institutional-title {
         color: white;
-        font-size: 1.25rem;
+        font-size: 1.35rem;
         font-weight: 800;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.25rem;
     }
 
     .institutional-user {
         color: #e5e7eb;
-        font-size: 0.9rem;
+        font-size: 0.92rem;
     }
 
-    /* BOTÓN CERRAR SESIÓN JUNTO A LA CABECERA */
-    .logout-header-button {
-        padding-top: 1.15rem;
+    /* BOTÓN CERRAR SESIÓN AL FINAL DE LA WEB */
+    .logout-bottom-container {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 3rem;
+        margin-bottom: 1.5rem;
     }
 
-    .logout-header-button div.stButton > button {
-        font-size: 0.76rem;
-        padding: 0.35rem 0.5rem;
-        min-height: 34px;
+    .logout-bottom-container div.stButton > button {
+        font-size: 0.82rem;
+        padding: 0.45rem 0.9rem;
+        min-height: 36px;
         border-radius: 3px;
-        background-color: #f3f4f6;
+        background-color: #ffffff;
         color: #003366;
-        border: 1px solid #cbd5e1;
+        border: 1px solid #003366;
         box-shadow: none;
         font-weight: 600;
     }
 
-    .logout-header-button div.stButton > button:hover {
-        background-color: #e5e7eb;
-        color: #00264d;
-        border: 1px solid #94a3b8;
+    .logout-bottom-container div.stButton > button:hover {
+        background-color: #003366;
+        color: #ffffff;
+        border: 1px solid #003366;
     }
 
     /* LOGIN */
@@ -174,7 +179,7 @@ st.markdown(
 
     /* PANTALLA PRINCIPAL */
     .home-spacer {
-        height: 4.5rem;
+        height: 3.8rem;
     }
 
     .selection-title {
@@ -316,6 +321,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
 # ============================================================
 # ESTADO DE SESIÓN
 # ============================================================
@@ -335,19 +341,6 @@ if "registro_demandado" not in st.session_state:
 if "mostrar_oposicion" not in st.session_state:
     st.session_state.mostrar_oposicion = False
 
-def cerrar_sesion():
-    st.session_state.autenticado = False
-    st.session_state.perfil = None
-    st.session_state.usuario_nombre = ""
-    st.session_state.registro_demandado = None
-    st.session_state.mostrar_oposicion = False
-
-    try:
-        st.query_params.clear()
-    except Exception:
-        pass
-
-    st.rerun()
 
 # ============================================================
 # UTILIDADES
@@ -903,31 +896,29 @@ def pantalla_login():
 # ============================================================
 
 def topbar():
-    col1, col2 = st.columns([8, 1.3])
+    st.markdown(
+        f"""
+        <div class="institutional-header">
+            <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
+            <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    with col1:
-        st.markdown(
-            f"""
-            <div class="institutional-header">
-                <div class="institutional-title">LexMonitor AI - Sede electrónica</div>
-                <div class="institutional-user">Sesión iniciada como: {st.session_state.usuario_nombre}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
 
-    with col2:
-        st.markdown('<div class="logout-header-button">', unsafe_allow_html=True)
+def boton_cerrar_sesion_final():
+    st.markdown('<div class="logout-bottom-container">', unsafe_allow_html=True)
 
-        if st.button("Cerrar sesión", key="btn_cerrar_sesion_header", use_container_width=True):
-            st.session_state.autenticado = False
-            st.session_state.perfil = None
-            st.session_state.usuario_nombre = ""
-            st.session_state.registro_demandado = None
-            st.session_state.mostrar_oposicion = False
-            st.rerun()
+    if st.button("Cerrar sesión", key="btn_cerrar_sesion_final"):
+        st.session_state.autenticado = False
+        st.session_state.perfil = None
+        st.session_state.usuario_nombre = ""
+        st.session_state.registro_demandado = None
+        st.session_state.mostrar_oposicion = False
+        st.rerun()
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1420,10 +1411,13 @@ if not st.session_state.autenticado:
 if st.session_state.perfil is None:
     topbar()
     pantalla_perfiles()
+    boton_cerrar_sesion_final()
     st.stop()
 
 if st.session_state.perfil == "demandante":
     pantalla_demandante()
+    boton_cerrar_sesion_final()
 
 elif st.session_state.perfil == "demandado":
     pantalla_demandado()
+    boton_cerrar_sesion_final()
