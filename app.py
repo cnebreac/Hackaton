@@ -759,43 +759,34 @@ def extraer_datos_demanda(texto_demanda, texto_documentos):
     demandante = buscar_patron(
         texto_unido,
         [
-            r"demandante[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
-            r"acreedor[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
-            r"promovido por[:\s]+(.+?)(?:contra|frente a|,|\.)",
-            r"a instancia de[:\s]+(.+?)(?:contra|frente a|,|\.)",
+            r"Don/Doña\s+(.+?)\s*,\s*\(en caso de actuar en representación",
+            r"representante de la entidad\s+(.+?)\s*,\s*con DNI",
         ]
     )
 
     demandado = buscar_patron(
         texto_unido,
         [
-            r"demandado[:\s]+(.+?)(?:,|\.)",
-            r"deudor[:\s]+(.+?)(?:,|\.)",
-            r"contra[:\s]+(.+?)(?:,|\.)",
-            r"frente a[:\s]+(.+?)(?:,|\.)",
+            r"contra:\s*Don/Doña\s+(.+?)\s+con DNI",
+            r"contra:\s*(.+?)\s+con DNI",
         ]
     )
 
     cuantia_txt = buscar_patron(
         texto_unido,
         [
-            r"cuantía[:\s]+(?:de\s*)?(?:€\s*)?([\d\.,]+)",
-            r"importe[:\s]+(?:de\s*)?(?:€\s*)?([\d\.,]+)",
-            r"cantidad[:\s]+(?:de\s*)?(?:€\s*)?([\d\.,]+)",
-            r"reclama(?:\s+la)?\s+cantidad\s+de\s+(?:€\s*)?([\d\.,]+)",
-            r"por\s+importe\s+de\s+(?:€\s*)?([\d\.,]+)",
+            r"EN RECLAMACIÓN DE\s+(.+?)\s+contra:",
+            r"pague/n la cantidad de\s+(.+?)(?:,|\.|y para el caso)",
         ]
     )
 
     cuantia = limpiar_numero(cuantia_txt)
 
     concepto_deuda = buscar_patron(
-        texto_unido,
-        [
-            r"concepto(?:\s+de\s+la\s+deuda)?[:\s]+(.{10,250})",
-            r"la deuda deriva de[:\s]+(.{10,250})",
-            r"deuda derivada de[:\s]+(.{10,250})",
-            r"por los siguientes hechos[:\s]+(.{10,250})",
+    texto_unido,
+    [
+        r"La cantidad reclamada tiene origen en las relaciones mantenidas entre las partes y, concretamente\s*[:\-]?\s*(.+?)\s+En atención a lo expuesto",
+        r"relate brevemente los hechos que han originado la deuda\s*\)?\s*[:\-]?\s*(.+?)\s+En atención a lo expuesto",
         ]
     )
 
