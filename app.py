@@ -1,11 +1,9 @@
-import os
+import streamlit as st
+import pandas as pd
 import re
 import uuid
 from datetime import datetime, date
-from io import BytesIO
-
-import pandas as pd
-import streamlit as st
+from pathlib import Path
 
 try:
     from docx import Document
@@ -24,6 +22,7 @@ except ImportError:
     gspread = None
     Credentials = None
 
+
 # ============================================================
 # CONFIGURACIÓN GENERAL
 # ============================================================
@@ -31,192 +30,313 @@ except ImportError:
 st.set_page_config(
     page_title="LexMonitor AI",
     page_icon="⚖️",
-    layout="wide",
+    layout="wide"
 )
 
-APP_TITLE = "LexMonitor AI"
-LOCAL_CSV = "expedientes_demo.csv"
-SHEET_NAME = "expedientes"
-LIMITE_ABREVIADO = 50000
+CSV_LOCAL = "expedientes_lexmonitor.csv"
 
-COLUMNAS = [
+HEADERS = [
     "codigo",
     "fecha_creacion",
     "estado",
-    "rol_ultima_accion",
     "demandante",
-    "email_demandante",
     "demandado",
-    "email_demandado",
     "cuantia",
     "concepto_deuda",
-    "hechos",
-    "documentacion_valida",
-    "categorias_art_812",
-    "documentos_subidos",
+    "documentacion_detectada",
+    "categoria_art_812",
     "respuesta_deudor",
+    "fecha_respuesta",
     "motivo_oposicion",
-    "fecha_respuesta_deudor",
     "accion_recomendada",
-    "borrador",
+    "borrador"
 ]
 
-ARTICULOS = {
-    "art_812": {
-        "referencia": "Art. 812 LEC",
-        "resumen": (
-            "Permite acudir al proceso monitorio cuando se reclama una deuda dineraria, líquida, "
-            "determinada, vencida y exigible, acreditada mediante documentos firmados o aceptados "
-            "por el deudor, facturas, albaranes, certificaciones u otros documentos habituales, "
-            "documentos comerciales de relación duradera o certificaciones de impago de comunidades."
-        ),
-    },
-    "admision": {
-        "referencia": "Art. 815 LEC",
-        "resumen": "Si los documentos aportados constituyen principio de prueba del derecho del peticionario, se requerirá al deudor para pagar o comparecer y alegar oposición.",
-    },
-    "pago": {
-        "referencia": "Art. 817 LEC",
-        "resumen": "Si el deudor atiende el requerimiento de pago, se archivan las actuaciones.",
-    },
-    "oposicion": {
-        "referencia": "Art. 818 LEC",
-        "resumen": "Si el deudor formula oposición, el asunto se resuelve por el juicio que corresponda según la cuantía.",
-    },
-    "incomparecencia": {
-        "referencia": "Art. 816 LEC",
-        "resumen": "Si el deudor no paga ni comparece, se dicta decreto dando por terminado el monitorio y se despacha ejecución.",
-    },
-}
 
 # ============================================================
-# GOOGLE SHEETS / ALMACENAMIENTO LOCAL
+# ESTILOS VISUALES
 # ============================================================
 
-def get_storage_mode():
-    """Devuelve 'sheets' si hay configuración válida; si no, 'local'."""
-    if gspread is None or Credentials is None:
-        return "local"
+st.markdown(
+    """
+    <style>
+    .main {
+        background: linear-gradient(135deg, #f4f7fb 0%, #e9eef7 100%);
+    }
 
-    has_secrets = "gcp_service_account" in st.secrets and "SPREADSHEET_ID" in st.secrets
-    return "sheets" if has_secrets else "local"
+    .login-wrapper {
+        max-width: 500px;
+        margin: 5rem auto 2rem auto;
+        padding: 2.7rem;
+        background: white;
+        border-radius: 28px;
+        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.14);
+        border: 1px solid #e5e7eb;
+        text-align: center;
+    }
+
+    .login-icon {
+        width: 78px;
+        height: 78px;
+        margin: 0 auto 1rem auto;
+        border-radius: 50%;
+        background: #1e3a8a;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        font-weight: bold;
+    }
+
+    .login-title {
+        font-size: 2rem;
+        font-weight: 850;
+        color: #111827;
+        margin-bottom: 0.35rem;
+    }
+
+    .login-subtitle {
+        font-size: 1rem;
+        color: #6b7280;
+        margin-bottom: 1.8rem;
+    }
+
+    .login-badge {
+        display: inline-block;
+        background: #eff6ff;
+        color: #1d4ed8;
+        padding: 0.38rem 0.85rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .role-card {
+        padding: 2rem;
+        border-radius: 24px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+        text-align: center;
+        min-height: 225px;
+        margin-bottom: 1rem;
+    }
+
+    .role-icon {
+        font-size: 2.3rem;
+        margin-bottom: 0.7rem;
+    }
+
+    .role-title {
+        font-size: 1.45rem;
+        font-weight: 850;
+        color: #111827;
+        margin-bottom: 0.5rem;
+    }
+
+    .role-text {
+        font-size: 0.98rem;
+        color: #6b7280;
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+
+    .panel {
+        background: white;
+        border-radius: 22px;
+        padding: 1.6rem;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+        margin-bottom: 1.2rem;
+    }
+
+    .status-box {
+        background: #f8fafc;
+        border-left: 5px solid #1d4ed8;
+        padding: 1rem 1.2rem;
+        border-radius: 14px;
+        margin-bottom: 1rem;
+    }
+
+    .success-box {
+        background: #ecfdf5;
+        border-left: 5px solid #059669;
+        padding: 1rem 1.2rem;
+        border-radius: 14px;
+        margin-bottom: 1rem;
+    }
+
+    .warning-box {
+        background: #fffbeb;
+        border-left: 5px solid #d97706;
+        padding: 1rem 1.2rem;
+        border-radius: 14px;
+        margin-bottom: 1rem;
+    }
+
+    div.stButton > button {
+        border-radius: 13px;
+        font-weight: 750;
+        padding: 0.7rem 1rem;
+    }
+
+    div[data-testid="stFileUploader"] {
+        background: #f9fafb;
+        border: 1px dashed #cbd5e1;
+        border-radius: 16px;
+        padding: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ============================================================
+# ESTADO DE SESIÓN
+# ============================================================
+
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+if "perfil" not in st.session_state:
+    st.session_state.perfil = None
+
+if "ultimo_codigo_generado" not in st.session_state:
+    st.session_state.ultimo_codigo_generado = None
+
+
+# ============================================================
+# GOOGLE SHEETS / CSV LOCAL
+# ============================================================
+
+def google_sheets_disponible():
+    return (
+        gspread is not None
+        and Credentials is not None
+        and "SPREADSHEET_ID" in st.secrets
+        and "gcp_service_account" in st.secrets
+    )
 
 
 def get_worksheet():
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/drive.readonly"
     ]
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=scopes
+
+    credentials = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes
     )
-    client = gspread.authorize(creds)
+
+    client = gspread.authorize(credentials)
     spreadsheet = client.open_by_key(st.secrets["SPREADSHEET_ID"])
 
     try:
-        ws = spreadsheet.worksheet(SHEET_NAME)
+        worksheet = spreadsheet.worksheet("expedientes")
     except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(title=SHEET_NAME, rows=1000, cols=len(COLUMNAS))
-        ws.append_row(COLUMNAS)
+        worksheet = spreadsheet.add_worksheet(
+            title="expedientes",
+            rows=1000,
+            cols=len(HEADERS)
+        )
+        worksheet.append_row(HEADERS)
 
-    headers = ws.row_values(1)
-    if headers != COLUMNAS:
-        ws.clear()
-        ws.append_row(COLUMNAS)
+    values = worksheet.get_all_values()
+    if not values:
+        worksheet.append_row(HEADERS)
 
-    return ws
-
-
-def empty_df():
-    return pd.DataFrame(columns=COLUMNAS)
-
-
-def load_data():
-    mode = get_storage_mode()
-
-    if mode == "sheets":
-        ws = get_worksheet()
-        records = ws.get_all_records()
-        if not records:
-            return empty_df()
-        df = pd.DataFrame(records)
-        for col in COLUMNAS:
-            if col not in df.columns:
-                df[col] = ""
-        return df[COLUMNAS]
-
-    if os.path.exists(LOCAL_CSV):
-        df = pd.read_csv(LOCAL_CSV, dtype=str).fillna("")
-        for col in COLUMNAS:
-            if col not in df.columns:
-                df[col] = ""
-        return df[COLUMNAS]
-
-    return empty_df()
+    return worksheet
 
 
-def save_record(record):
-    record = {col: str(record.get(col, "")) for col in COLUMNAS}
-    mode = get_storage_mode()
-
-    if mode == "sheets":
-        ws = get_worksheet()
-        ws.append_row([record[col] for col in COLUMNAS])
-        return
-
-    df = load_data()
-    df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
-    df.to_csv(LOCAL_CSV, index=False)
+def asegurar_csv_local():
+    path = Path(CSV_LOCAL)
+    if not path.exists():
+        pd.DataFrame(columns=HEADERS).to_csv(path, index=False)
 
 
-def update_record(codigo, updates):
-    mode = get_storage_mode()
-
-    if mode == "sheets":
-        ws = get_worksheet()
-        values = ws.get_all_values()
-        if not values:
-            return False
-        headers = values[0]
+def cargar_registros():
+    if google_sheets_disponible():
         try:
-            codigo_idx = headers.index("codigo") + 1
-        except ValueError:
-            return False
+            ws = get_worksheet()
+            records = ws.get_all_records()
+            return pd.DataFrame(records, columns=HEADERS)
+        except Exception as e:
+            st.warning(f"No se pudo conectar con Google Sheets. Usando CSV local. Error: {e}")
 
-        codigos = ws.col_values(codigo_idx)
-        if codigo not in codigos:
-            return False
-        row_number = codigos.index(codigo) + 1
+    asegurar_csv_local()
+    return pd.read_csv(CSV_LOCAL, dtype=str).fillna("")
 
-        for key, value in updates.items():
-            if key in headers:
-                col_number = headers.index(key) + 1
-                ws.update_cell(row_number, col_number, str(value))
-        return True
 
-    df = load_data()
-    if df.empty or codigo not in df["codigo"].values:
+def guardar_registro(registro):
+    registro_completo = {h: str(registro.get(h, "")) for h in HEADERS}
+
+    if google_sheets_disponible():
+        try:
+            ws = get_worksheet()
+            ws.append_row([registro_completo[h] for h in HEADERS])
+            return "google_sheets"
+        except Exception as e:
+            st.warning(f"No se pudo guardar en Google Sheets. Se guardará en CSV local. Error: {e}")
+
+    asegurar_csv_local()
+    df = pd.read_csv(CSV_LOCAL, dtype=str).fillna("")
+    df = pd.concat([df, pd.DataFrame([registro_completo])], ignore_index=True)
+    df.to_csv(CSV_LOCAL, index=False)
+    return "csv_local"
+
+
+def actualizar_registro(codigo, cambios):
+    df = cargar_registros()
+
+    if df.empty or "codigo" not in df.columns:
         return False
 
-    for key, value in updates.items():
-        if key in df.columns:
-            df.loc[df["codigo"] == codigo, key] = str(value)
+    mask = df["codigo"].astype(str).str.upper() == codigo.upper()
 
-    df.to_csv(LOCAL_CSV, index=False)
+    if not mask.any():
+        return False
+
+    for clave, valor in cambios.items():
+        if clave in df.columns:
+            df.loc[mask, clave] = str(valor)
+
+    if google_sheets_disponible():
+        try:
+            ws = get_worksheet()
+            values = df[HEADERS].fillna("").values.tolist()
+            ws.clear()
+            ws.append_row(HEADERS)
+            if values:
+                ws.append_rows(values)
+            return True
+        except Exception as e:
+            st.warning(f"No se pudo actualizar Google Sheets. Se actualizará CSV local. Error: {e}")
+
+    asegurar_csv_local()
+    df.to_csv(CSV_LOCAL, index=False)
     return True
 
 
-def get_record(codigo):
-    df = load_data()
-    if df.empty:
+def buscar_por_codigo(codigo):
+    df = cargar_registros()
+
+    if df.empty or "codigo" not in df.columns:
         return None
-    coincidencias = df[df["codigo"].astype(str).str.upper() == codigo.upper()]
-    if coincidencias.empty:
+
+    mask = df["codigo"].astype(str).str.upper() == codigo.upper()
+
+    if not mask.any():
         return None
-    return coincidencias.iloc[0].to_dict()
+
+    return df[mask].iloc[0].to_dict()
+
 
 # ============================================================
-# LECTURA DE ARCHIVOS
+# LECTURA DE DOCUMENTOS
 # ============================================================
 
 def leer_txt(archivo):
@@ -225,63 +345,85 @@ def leer_txt(archivo):
 
 def leer_docx(archivo):
     if Document is None:
-        return "ERROR: instala python-docx con: pip install python-docx"
+        return ""
+
     doc = Document(archivo)
     textos = []
+
     for p in doc.paragraphs:
         if p.text.strip():
             textos.append(p.text.strip())
+
     for tabla in doc.tables:
         for fila in tabla.rows:
-            textos.append(" | ".join(c.text.strip() for c in fila.cells))
+            celdas = [celda.text.strip() for celda in fila.cells]
+            textos.append(" | ".join(celdas))
+
     return "\n".join(textos)
 
 
 def leer_pdf(archivo):
     if PyPDF2 is None:
-        return "ERROR: instala PyPDF2 con: pip install PyPDF2"
-    reader = PyPDF2.PdfReader(archivo)
+        return ""
+
+    lector = PyPDF2.PdfReader(archivo)
     textos = []
-    for page in reader.pages:
-        text = page.extract_text()
-        if text:
-            textos.append(text)
+
+    for pagina in lector.pages:
+        texto = pagina.extract_text()
+        if texto:
+            textos.append(texto)
+
     return "\n".join(textos)
 
 
 def leer_documento(archivo):
     nombre = archivo.name.lower()
+
     if nombre.endswith(".txt"):
         return leer_txt(archivo)
+
     if nombre.endswith(".docx"):
         return leer_docx(archivo)
+
     if nombre.endswith(".pdf"):
         return leer_pdf(archivo)
+
     return ""
 
+
 # ============================================================
-# EXTRACCIÓN Y VALIDACIÓN ART. 812 LEC
+# EXTRACCIÓN DE DATOS
 # ============================================================
 
 def limpiar_numero(texto_numero):
     if not texto_numero:
         return 0.0
-    texto_numero = texto_numero.lower().replace("euros", "").replace("eur", "")
-    texto_numero = texto_numero.replace("€", "").replace("lempiras", "").replace("l.", "")
+
+    texto_numero = texto_numero.lower()
+    texto_numero = texto_numero.replace("lempiras", "")
+    texto_numero = texto_numero.replace("euros", "")
+    texto_numero = texto_numero.replace("€", "")
+    texto_numero = texto_numero.replace("l.", "")
+    texto_numero = texto_numero.replace("l ", "")
     texto_numero = texto_numero.strip()
 
     if "," in texto_numero and "." in texto_numero:
-        if texto_numero.find(".") < texto_numero.find(","):
-            texto_numero = texto_numero.replace(".", "").replace(",", ".")
-        else:
+        if texto_numero.find(",") < texto_numero.find("."):
             texto_numero = texto_numero.replace(",", "")
+        else:
+            texto_numero = texto_numero.replace(".", "").replace(",", ".")
     elif "," in texto_numero:
         partes = texto_numero.split(",")
-        texto_numero = texto_numero.replace(",", ".") if len(partes[-1]) == 2 else texto_numero.replace(",", "")
+        if len(partes[-1]) == 2:
+            texto_numero = texto_numero.replace(",", ".")
+        else:
+            texto_numero = texto_numero.replace(",", "")
     elif "." in texto_numero:
         partes = texto_numero.split(".")
         if len(partes[-1]) != 2:
             texto_numero = texto_numero.replace(".", "")
+
     try:
         return float(texto_numero)
     except ValueError:
@@ -298,494 +440,788 @@ def buscar_patron(texto, patrones):
 
 def detectar_documentos_art_812(texto):
     texto = texto.lower()
+
     categorias = {
-        "Documentos firmados por el deudor o con sello/señal": [
-            "firmado por el deudor", "firma del deudor", "sello del deudor", "impronta",
-            "marca del deudor", "firma electrónica", "firma electronica", "señal electrónica", "senal electronica",
-            "aceptado por el deudor", "conformidad del deudor",
+        "Documento firmado, sellado o validado por el deudor": [
+            "firmado por el deudor",
+            "firma del deudor",
+            "sello del deudor",
+            "impronta",
+            "marca del deudor",
+            "firma electrónica",
+            "señal electrónica",
+            "documento firmado"
         ],
         "Facturas, albaranes, certificaciones, telegramas, fax u otros documentos habituales": [
-            "factura", "facturas", "albarán", "albaran", "albaranes", "certificación", "certificacion",
-            "certificaciones", "telegrama", "telegramas", "fax", "burofax", "recibo", "recibos",
-            "estado de cuenta", "comprobante", "orden de pedido", "pedido", "presupuesto aceptado",
+            "factura",
+            "facturas",
+            "albarán",
+            "albaranes",
+            "albarán de entrega",
+            "certificación",
+            "certificaciones",
+            "telegrama",
+            "telegramas",
+            "fax",
+            "recibo",
+            "recibos",
+            "estado de cuenta",
+            "comprobante"
         ],
-        "Documentos comerciales de relación anterior duradera": [
-            "relación comercial anterior", "relacion comercial anterior", "relación anterior duradera",
-            "relacion anterior duradera", "relación contractual continuada", "relacion contractual continuada",
-            "contrato marco", "contrato de suministro", "historial de pedidos", "documentos comerciales",
-            "relación comercial continuada", "relacion comercial continuada",
+        "Documentos comerciales que acreditan relación anterior duradera": [
+            "relación comercial anterior",
+            "relación anterior duradera",
+            "relación contractual continuada",
+            "contrato marco",
+            "contrato de suministro",
+            "historial de pedidos",
+            "documentos comerciales",
+            "relación mercantil"
         ],
-        "Certificaciones de impago de comunidades de propietarios": [
-            "certificación de impago", "certificacion de impago", "gastos comunes", "comunidad de propietarios",
-            "inmueble urbano", "cuotas comunitarias", "cuota comunitaria", "acta de la comunidad",
+        "Certificación de impago de comunidad de propietarios": [
+            "certificación de impago",
+            "certificaciones de impago",
+            "gastos comunes",
+            "comunidad de propietarios",
+            "inmueble urbano",
+            "cuotas comunitarias"
         ],
     }
+
     detectados = {}
+
     for categoria, palabras in categorias.items():
-        coincidencias = sorted(set(p for p in palabras if p in texto))
+        coincidencias = [p for p in palabras if p in texto]
         detectados[categoria] = coincidencias
-    hay_valido = any(detectados[c] for c in detectados)
-    categorias_detectadas = [c for c, v in detectados.items() if v]
-    return hay_valido, detectados, categorias_detectadas
+
+    hay_documento_valido = any(len(v) > 0 for v in detectados.values())
+
+    return hay_documento_valido, detectados
 
 
-def extraer_datos_demanda(texto_demanda, texto_documentos=""):
+def categorias_detectadas_texto(documentos_art_812):
+    categorias = []
+
+    for categoria, coincidencias in documentos_art_812.items():
+        if coincidencias:
+            categorias.append(categoria)
+
+    return "; ".join(categorias)
+
+
+def extraer_datos_demanda(texto_demanda, texto_documentos):
     texto_total = f"{texto_demanda}\n\n{texto_documentos}"
     texto_unido = re.sub(r"\s+", " ", texto_total)
-    texto_demanda_unido = re.sub(r"\s+", " ", texto_demanda)
 
-    demandante = buscar_patron(texto_demanda_unido, [
-        r"demandante[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
-        r"acreedor[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
-        r"solicitante[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
-        r"a instancia de[:\s]+(.+?)(?:contra|frente a|,|\.)",
-    ])
+    demandante = buscar_patron(
+        texto_unido,
+        [
+            r"demandante[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
+            r"acreedor[:\s]+(.+?)(?:demandado|deudor|contra|frente a|,|\.)",
+            r"promovido por[:\s]+(.+?)(?:contra|frente a|,|\.)",
+            r"a instancia de[:\s]+(.+?)(?:contra|frente a|,|\.)",
+        ]
+    )
 
-    demandado = buscar_patron(texto_demanda_unido, [
-        r"demandado[:\s]+(.+?)(?:,|\.)",
-        r"deudor[:\s]+(.+?)(?:,|\.)",
-        r"contra[:\s]+(.+?)(?:,|\.)",
-        r"frente a[:\s]+(.+?)(?:,|\.)",
-    ])
+    demandado = buscar_patron(
+        texto_unido,
+        [
+            r"demandado[:\s]+(.+?)(?:,|\.)",
+            r"deudor[:\s]+(.+?)(?:,|\.)",
+            r"contra[:\s]+(.+?)(?:,|\.)",
+            r"frente a[:\s]+(.+?)(?:,|\.)",
+        ]
+    )
 
-    cuantia_txt = buscar_patron(texto_unido, [
-        r"cuantía[:\s]+(?:de\s*)?(?:€|eur|euros|L\.?\s*)?([\d\.,]+)",
-        r"importe[:\s]+(?:de\s*)?(?:€|eur|euros|L\.?\s*)?([\d\.,]+)",
-        r"cantidad[:\s]+(?:de\s*)?(?:€|eur|euros|L\.?\s*)?([\d\.,]+)",
-        r"suma[:\s]+(?:de\s*)?(?:€|eur|euros|L\.?\s*)?([\d\.,]+)",
-        r"reclama(?:\s+la)?\s+cantidad\s+de\s+(?:€|eur|euros|L\.?\s*)?([\d\.,]+)",
-        r"por\s+importe\s+de\s+(?:€|eur|euros|L\.?\s*)?([\d\.,]+)",
-    ])
+    cuantia_txt = buscar_patron(
+        texto_unido,
+        [
+            r"cuantía[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
+            r"importe[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
+            r"cantidad[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
+            r"suma[:\s]+(?:de\s*)?(?:L\.?\s*)?([\d\.,]+)",
+            r"reclama(?:\s+la)?\s+cantidad\s+de\s+(?:L\.?\s*)?([\d\.,]+)",
+            r"por\s+importe\s+de\s+(?:L\.?\s*)?([\d\.,]+)",
+        ]
+    )
+
     cuantia = limpiar_numero(cuantia_txt)
 
-    concepto = buscar_patron(texto_demanda_unido, [
-        r"concepto(?:\s+de\s+la\s+deuda)?[:\s]+(.{10,250})",
-        r"la deuda deriva de[:\s]+(.{10,250})",
-        r"por los siguientes hechos[:\s]+(.{10,250})",
-    ])
+    concepto_deuda = buscar_patron(
+        texto_unido,
+        [
+            r"concepto(?:\s+de\s+la\s+deuda)?[:\s]+(.{10,250})",
+            r"la deuda deriva de[:\s]+(.{10,250})",
+            r"deuda derivada de[:\s]+(.{10,250})",
+            r"por los siguientes hechos[:\s]+(.{10,250})",
+        ]
+    )
 
-    hay_doc_812, documentos_art_812, categorias_detectadas = detectar_documentos_art_812(texto_documentos)
-
-    if not hay_doc_812:
-        hay_doc_812, documentos_art_812, categorias_detectadas = detectar_documentos_art_812(texto_total)
-
-    menciona_monitorio = "monitorio" in texto_total.lower()
-    deuda_ok = any(p in texto_total.lower() for p in [
-        "deuda dineraria", "deuda líquida", "deuda liquida", "deuda determinada",
-        "deuda vencida", "deuda exigible", "cantidad determinada", "vencida y exigible",
-    ])
+    hay_documento_deuda, documentos_art_812 = detectar_documentos_art_812(texto_documentos)
 
     datos_faltantes = []
+
     if not demandante:
         datos_faltantes.append("Demandante / acreedor")
     if not demandado:
         datos_faltantes.append("Demandado / deudor")
     if cuantia <= 0:
         datos_faltantes.append("Cuantía")
-    if not hay_doc_812:
-        datos_faltantes.append("Documentación válida del art. 812 LEC")
+    if not hay_documento_deuda:
+        datos_faltantes.append("Documentación acreditativa art. 812 LEC")
 
-    cumple_requisitos_auto = bool(demandante) and bool(demandado) and cuantia > 0 and hay_doc_812
+    cumple_requisitos_auto = (
+        bool(demandante)
+        and bool(demandado)
+        and cuantia > 0
+        and hay_documento_deuda
+    )
 
     return {
         "demandante": demandante,
         "demandado": demandado,
         "cuantia": cuantia,
-        "concepto_deuda": concepto,
-        "menciona_monitorio": menciona_monitorio,
-        "deuda_ok_texto": deuda_ok,
-        "documentacion_valida": hay_doc_812,
+        "concepto_deuda": concepto_deuda,
+        "hay_documento_deuda": hay_documento_deuda,
         "documentos_art_812": documentos_art_812,
-        "categorias_detectadas": categorias_detectadas,
-        "hechos_resumidos": texto_demanda_unido[:1000],
+        "categoria_art_812": categorias_detectadas_texto(documentos_art_812),
         "datos_faltantes": datos_faltantes,
         "cumple_requisitos_auto": cumple_requisitos_auto,
+        "hechos_resumidos": texto_unido[:1000],
     }
 
+
 # ============================================================
-# GENERACIÓN DE CÓDIGO Y BORRADORES
+# CÓDIGOS Y BORRADORES
 # ============================================================
 
 def generar_codigo():
     year = datetime.now().year
-    corto = uuid.uuid4().hex[:6].upper()
-    return f"MON-{year}-{corto}"
+    sufijo = uuid.uuid4().hex[:6].upper()
+    return f"MON-{year}-{sufijo}"
 
 
-def generar_borrador_admision(record):
-    return f"""BORRADOR DE ADMISIÓN / REQUERIMIENTO DE PAGO
+def generar_borrador_admision(registro):
+    return f"""
+AUTO DE ADMISIÓN DE SOLICITUD MONITORIA
 
-Código de expediente: {record['codigo']}
+Código de expediente: {registro['codigo']}
 
-Vista la solicitud monitoria presentada por {record['demandante']} frente a {record['demandado']}, por importe de {record['cuantia']} euros, y examinada la documentación aportada al amparo del art. 812 LEC, se aprecia inicialmente la existencia de documentación suficiente para tramitar la petición.
+Visto el escrito presentado por {registro['demandante']} frente a {registro['demandado']}, por importe de {registro['cuantia']} euros, y examinada la documentación aportada, se aprecia inicialmente que la solicitud contiene los datos básicos necesarios y documentación acreditativa de la deuda.
 
-Procede requerir al deudor para que pague la cantidad reclamada o comparezca formulando oposición en el plazo legalmente previsto.
+Documentación detectada:
+{registro['categoria_art_812']}
 
-Referencia normativa: {ARTICULOS['art_812']['referencia']} y {ARTICULOS['admision']['referencia']}.
+En consecuencia, procede admitir la solicitud monitoria y requerir al deudor para que pague la cantidad reclamada o formule oposición en el plazo legalmente previsto.
 
-Actuación recomendada: notificar al demandado/deudor.
-"""
+Actuación recomendada:
+{registro['accion_recomendada']}
 
-
-def generar_borrador_subsanacion(datos):
-    faltantes = ", ".join(datos.get("datos_faltantes", [])) or "documentación o datos necesarios"
-    return f"""BORRADOR DE REQUERIMIENTO DE SUBSANACIÓN
-
-Examinada la solicitud presentada, se advierte que no constan suficientemente los siguientes extremos: {faltantes}.
-
-Antes de admitir la petición monitoria, procede requerir a la parte solicitante para que complete o aclare la documentación necesaria, especialmente la documentación acreditativa prevista en el art. 812 LEC.
-
-Referencia normativa: {ARTICULOS['art_812']['referencia']}.
-"""
+Documento generado automáticamente para revisión humana.
+""".strip()
 
 
-def generar_borrador_respuesta(record, respuesta, motivo=""):
-    if respuesta == "Pagado":
-        return f"""DILIGENCIA DE PAGO Y ARCHIVO
+def generar_borrador_subsanacion(registro):
+    return f"""
+AUTO DE REQUERIMIENTO DE SUBSANACIÓN
 
-Expediente: {record['codigo']}
+Código de expediente: {registro['codigo']}
 
-Constando que el deudor {record['demandado']} ha manifestado su voluntad de pagar la deuda reclamada por {record['demandante']} por importe de {record['cuantia']} euros, procede dejar constancia del pago y archivar las actuaciones, previa comprobación efectiva del abono.
+Examinada la solicitud presentada por {registro['demandante']} frente a {registro['demandado']}, se aprecia que no constan todos los elementos necesarios para su admisión inicial.
 
-Referencia normativa: {ARTICULOS['pago']['referencia']}.
-"""
-    if respuesta == "Oposición presentada":
-        return f"""BORRADOR DE ADMISIÓN DE OPOSICIÓN
+Datos o documentos pendientes:
+{registro.get('documentacion_detectada', '')}
 
-Expediente: {record['codigo']}
+En consecuencia, procede requerir a la parte solicitante para que subsane o complete la documentación necesaria.
 
-El deudor {record['demandado']} formula oposición frente a la reclamación presentada por {record['demandante']}.
+Actuación recomendada:
+{registro['accion_recomendada']}
 
-Motivo alegado:
-{motivo or 'No especificado'}
+Documento generado automáticamente para revisión humana.
+""".strip()
 
-Procede tener por formulada oposición y continuar por el procedimiento que corresponda según la cuantía.
 
-Referencia normativa: {ARTICULOS['oposicion']['referencia']}.
-"""
-    return f"""BORRADOR DE FINALIZACIÓN DEL MONITORIO Y DESPACHO DE EJECUCIÓN
+def generar_borrador_pago(registro):
+    return f"""
+DILIGENCIA DE PAGO Y ARCHIVO
 
-Expediente: {record['codigo']}
+Código de expediente: {registro['codigo']}
 
-Constando que el deudor {record['demandado']} no paga ni comparece, procede dar por terminado el proceso monitorio y abrir la vía de ejecución por la cantidad reclamada de {record['cuantia']} euros, previa validación por el órgano competente.
+Constando que la parte demandada ha seleccionado la opción de pago respecto de la reclamación formulada por {registro['demandante']}, procede tener por atendida la reclamación y acordar el archivo de las actuaciones, previa comprobación del pago.
 
-Referencia normativa: {ARTICULOS['incomparecencia']['referencia']}.
-"""
+Documento generado automáticamente para revisión humana.
+""".strip()
+
+
+def generar_borrador_oposicion(registro, motivo):
+    return f"""
+ESCRITO / REGISTRO DE OPOSICIÓN
+
+Código de expediente: {registro['codigo']}
+
+La parte demandada manifiesta su oposición al pago reclamado por {registro['demandante']}.
+
+Cantidad reclamada:
+{registro['cuantia']} euros
+
+Motivo de oposición indicado:
+{motivo}
+
+Actuación recomendada:
+Dar traslado de la oposición y continuar por el cauce procesal correspondiente según la cuantía.
+
+Documento generado automáticamente para revisión humana.
+""".strip()
+
+
+def generar_borrador_no_comparece(registro):
+    return f"""
+AUTO DE EJECUCIÓN POR FALTA DE PAGO U OPOSICIÓN
+
+Código de expediente: {registro['codigo']}
+
+Constando que la parte demandada no ha pagado ni ha formulado oposición dentro del escenario simulado, procede continuar con la actuación correspondiente por falta de comparecencia.
+
+Actuación recomendada:
+Iniciar ejecución por vía de apremio, previa comprobación del vencimiento del plazo legal.
+
+Documento generado automáticamente para revisión humana.
+""".strip()
+
 
 # ============================================================
-# AUTENTICACIÓN FICTICIA
+# LOGIN Y SELECCIÓN DE PERFIL
 # ============================================================
 
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
-if "perfil" not in st.session_state:
-    st.session_state.perfil = None
+def pantalla_login():
+    st.markdown(
+        """
+        <div class="login-wrapper">
+            <div class="login-icon">⚖️</div>
+            <div class="login-badge">Acceso seguro</div>
+            <div class="login-title">LexMonitor AI</div>
+            <div class="login-subtitle">
+                Identificación mediante certificado digital
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-st.title(f"⚖️ {APP_TITLE}")
-st.caption("Prototipo de hackathon para proceso monitorio: registro, documentación art. 812 LEC y respuesta del deudor.")
+    col1, col2, col3 = st.columns([1, 2, 1])
 
-if not st.session_state.autenticado:
-    st.header("🔐 Autenticación con certificado digital")
-    st.info("Para la demo, sube un archivo vacío o ficticio con nombre de certificado. No se valida criptográficamente.")
-    certificado = st.file_uploader("Sube tu certificado digital", type=["pdf", "txt", "cer", "crt", "pem"], key="certificado")
-    if certificado is not None:
-        st.success(f"Certificado '{certificado.name}' detectado correctamente.")
-        if st.button("Acceder a LexMonitor AI", type="primary"):
+    with col2:
+        certificado = st.file_uploader(
+            "Selecciona tu certificado digital",
+            type=["pdf", "txt", "cer", "crt", "p12", "pfx"],
+            label_visibility="collapsed"
+        )
+
+        entrar = st.button(
+            "Acceder con certificado digital",
+            use_container_width=True,
+            disabled=certificado is None
+        )
+
+        if entrar and certificado is not None:
             st.session_state.autenticado = True
             st.rerun()
+
+
+def pantalla_perfiles():
+    st.title("Selecciona tu perfil de acceso")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(
+            """
+            <div class="role-card">
+                <div class="role-icon">📄</div>
+                <div class="role-title">Demandante / Acreedor</div>
+                <div class="role-text">
+                    Presenta una solicitud monitoria, aporta documentación
+                    y genera el código de expediente.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button("Entrar como Demandante", use_container_width=True):
+            st.session_state.perfil = "demandante"
+            st.rerun()
+
+    with col2:
+        st.markdown(
+            """
+            <div class="role-card">
+                <div class="role-icon">💼</div>
+                <div class="role-title">Demandado / Deudor</div>
+                <div class="role-text">
+                    Consulta una reclamación mediante código y selecciona
+                    pagar, oponerte o no comparecer.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button("Entrar como Demandado", use_container_width=True):
+            st.session_state.perfil = "demandado"
+            st.rerun()
+
+
+# ============================================================
+# DEMANDANTE
+# ============================================================
+
+def pantalla_demandante():
+    st.title("Zona del Demandante / Acreedor")
+
+    st.markdown(
+        """
+        <div class="status-box">
+            Presenta la solicitud monitoria mediante una plantilla ya rellenada
+            o completando el formulario desde la aplicación.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    modo = st.radio(
+        "Elige cómo quieres presentar la solicitud",
+        [
+            "Subir PDF/DOCX/TXT de plantilla rellena",
+            "Rellenar formulario desde la app"
+        ],
+        horizontal=True
+    )
+
+    texto_demanda = ""
+    texto_documentos = ""
+
+    datos_manual = {
+        "demandante": "",
+        "demandado": "",
+        "cuantia": 0.0,
+        "concepto_deuda": ""
+    }
+
+    if modo == "Subir PDF/DOCX/TXT de plantilla rellena":
+        st.subheader("1. Subir solicitud monitoria")
+
+        demanda_file = st.file_uploader(
+            "Sube la demanda o solicitud principal",
+            type=["pdf", "docx", "txt"],
+            key="demanda_principal"
+        )
+
+        if demanda_file is not None:
+            texto_demanda = leer_documento(demanda_file)
+
+            with st.expander("Ver texto leído de la solicitud"):
+                st.text_area("Texto detectado", texto_demanda, height=240)
+
+    else:
+        st.subheader("1. Rellenar formulario de solicitud monitoria")
+
+        c1, c2 = st.columns(2)
+
+        datos_manual["demandante"] = c1.text_input("Demandante / acreedor")
+        datos_manual["demandado"] = c2.text_input("Demandado / deudor")
+
+        datos_manual["cuantia"] = st.number_input(
+            "Cuantía reclamada",
+            min_value=0.0,
+            step=100.0
+        )
+
+        datos_manual["concepto_deuda"] = st.text_area(
+            "Concepto de la deuda",
+            placeholder="Ejemplo: deuda derivada de factura impagada por prestación de servicios..."
+        )
+
+        texto_demanda = f"""
+        Demandante: {datos_manual['demandante']}.
+        Demandado: {datos_manual['demandado']}.
+        Cuantía: {datos_manual['cuantia']}.
+        Concepto de la deuda: {datos_manual['concepto_deuda']}.
+        Solicito la tramitación de proceso monitorio.
+        """
+
+    st.subheader("2. Subir documentos acreditativos art. 812 LEC")
+
+    documentos_files = st.file_uploader(
+        "Sube facturas, albaranes, certificaciones, documentos firmados, documentos comerciales o certificaciones de impago",
+        type=["pdf", "docx", "txt"],
+        accept_multiple_files=True,
+        key="documentos_acreditativos"
+    )
+
+    if documentos_files:
+        textos_docs = []
+
+        for doc_file in documentos_files:
+            texto_doc = leer_documento(doc_file)
+            textos_docs.append(
+                f"\n\n--- DOCUMENTO ACREDITATIVO: {doc_file.name} ---\n{texto_doc}"
+            )
+
+        texto_documentos = "\n".join(textos_docs)
+
+        with st.expander("Ver texto leído de los documentos"):
+            st.text_area("Documentos detectados", texto_documentos, height=240)
+
+    st.subheader("3. Comprobación y generación de código")
+
+    if modo == "Rellenar formulario desde la app":
+        datos_extraidos = {
+            "demandante": datos_manual["demandante"],
+            "demandado": datos_manual["demandado"],
+            "cuantia": datos_manual["cuantia"],
+            "concepto_deuda": datos_manual["concepto_deuda"],
+            "hechos_resumidos": texto_demanda[:1000]
+        }
+
+        hay_doc, documentos_art_812 = detectar_documentos_art_812(texto_documentos)
+        datos_extraidos["hay_documento_deuda"] = hay_doc
+        datos_extraidos["documentos_art_812"] = documentos_art_812
+        datos_extraidos["categoria_art_812"] = categorias_detectadas_texto(documentos_art_812)
+
+        datos_faltantes = []
+        if not datos_extraidos["demandante"]:
+            datos_faltantes.append("Demandante / acreedor")
+        if not datos_extraidos["demandado"]:
+            datos_faltantes.append("Demandado / deudor")
+        if datos_extraidos["cuantia"] <= 0:
+            datos_faltantes.append("Cuantía")
+        if not hay_doc:
+            datos_faltantes.append("Documentación acreditativa art. 812 LEC")
+
+        datos_extraidos["datos_faltantes"] = datos_faltantes
+        datos_extraidos["cumple_requisitos_auto"] = len(datos_faltantes) == 0
+
+    else:
+        datos_extraidos = extraer_datos_demanda(texto_demanda, texto_documentos)
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Demandante", datos_extraidos["demandante"] or "No detectado")
+    col2.metric("Demandado", datos_extraidos["demandado"] or "No detectado")
+    col3.metric("Cuantía", f"{float(datos_extraidos['cuantia']):,.2f}")
+
+    if datos_extraidos["hay_documento_deuda"]:
+        st.markdown(
+            """
+            <div class="success-box">
+                Documentación acreditativa detectada conforme al art. 812 LEC.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            """
+            <div class="warning-box">
+                No se ha detectado documentación acreditativa suficiente.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with st.expander("Ver categorías documentales detectadas"):
+        docs_812 = datos_extraidos.get("documentos_art_812", {})
+        for categoria, coincidencias in docs_812.items():
+            if coincidencias:
+                st.success(f"{categoria}: {', '.join(coincidencias)}")
+            else:
+                st.info(f"{categoria}: no detectado")
+
+    if datos_extraidos["datos_faltantes"]:
+        st.warning("Datos pendientes: " + ", ".join(datos_extraidos["datos_faltantes"]))
+
+    generar = st.button(
+        "Generar código de demanda",
+        use_container_width=True,
+        disabled=not bool(datos_extraidos["demandante"]) or not bool(datos_extraidos["demandado"])
+    )
+
+    if generar:
+        codigo = generar_codigo()
+        cumple = datos_extraidos["cumple_requisitos_auto"]
+
+        if cumple:
+            estado = "Pendiente de respuesta del deudor"
+            accion = "Requerir al deudor para pagar u oponerse"
+            documentacion_detectada = "Sí"
+        else:
+            estado = "Pendiente de subsanación"
+            accion = "Requerir subsanación documental"
+            documentacion_detectada = "No"
+
+        registro = {
+            "codigo": codigo,
+            "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "estado": estado,
+            "demandante": datos_extraidos["demandante"],
+            "demandado": datos_extraidos["demandado"],
+            "cuantia": str(datos_extraidos["cuantia"]),
+            "concepto_deuda": datos_extraidos.get("concepto_deuda", ""),
+            "documentacion_detectada": documentacion_detectada,
+            "categoria_art_812": datos_extraidos.get("categoria_art_812", ""),
+            "respuesta_deudor": "",
+            "fecha_respuesta": "",
+            "motivo_oposicion": "",
+            "accion_recomendada": accion,
+            "borrador": ""
+        }
+
+        if cumple:
+            borrador = generar_borrador_admision(registro)
+        else:
+            borrador = generar_borrador_subsanacion(registro)
+
+        registro["borrador"] = borrador
+
+        destino = guardar_registro(registro)
+        st.session_state.ultimo_codigo_generado = codigo
+
+        st.success(f"Código generado correctamente: {codigo}")
+
+        if destino == "google_sheets":
+            st.info("Registro guardado en Google Sheets.")
+        else:
+            st.info("Registro guardado en CSV local.")
+
+        st.subheader("Resumen del expediente generado")
+
+        st.json({
+            "codigo": codigo,
+            "estado": estado,
+            "demandante": registro["demandante"],
+            "demandado": registro["demandado"],
+            "cuantia": registro["cuantia"],
+            "documentacion_detectada": registro["documentacion_detectada"],
+            "categoria_art_812": registro["categoria_art_812"],
+            "accion_recomendada": registro["accion_recomendada"]
+        })
+
+        st.subheader("Borrador generado")
+        st.text_area("Borrador", borrador, height=360)
+
+        st.download_button(
+            "Descargar borrador",
+            data=borrador,
+            file_name=f"borrador_{codigo}.txt",
+            mime="text/plain"
+        )
+
+
+# ============================================================
+# DEMANDADO
+# ============================================================
+
+def pantalla_demandado():
+    st.title("Zona del Demandado / Deudor")
+
+    st.markdown(
+        """
+        <div class="status-box">
+            Introduce el código de la reclamación para consultar el resumen
+            y seleccionar una actuación.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    codigo = st.text_input(
+        "Código de demanda",
+        placeholder="Ejemplo: MON-2026-ABC123"
+    )
+
+    buscar = st.button("Buscar reclamación", use_container_width=True)
+
+    if buscar and codigo:
+        registro = buscar_por_codigo(codigo.strip())
+
+        if registro is None:
+            st.error("No se ha encontrado ninguna reclamación con ese código.")
+            return
+
+        st.session_state.registro_demandado = registro
+
+    registro = st.session_state.get("registro_demandado")
+
+    if not registro:
+        return
+
+    st.subheader("Resumen de la reclamación")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Código", registro.get("codigo", ""))
+    c2.metric("Estado", registro.get("estado", ""))
+    c3.metric("Cantidad reclamada", f"{registro.get('cuantia', '')} €")
+
+    st.markdown(
+        f"""
+        <div class="panel">
+            <b>Demandante / acreedor:</b> {registro.get('demandante', '')}<br>
+            <b>Demandado / deudor:</b> {registro.get('demandado', '')}<br>
+            <b>Concepto de la deuda:</b> {registro.get('concepto_deuda', '')}<br>
+            <b>Documentación aportada:</b> {registro.get('categoria_art_812', '')}<br>
+            <b>Actuación recomendada actual:</b> {registro.get('accion_recomendada', '')}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.subheader("Selecciona una actuación")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("Pagar deuda", use_container_width=True):
+            borrador = generar_borrador_pago(registro)
+
+            actualizar_registro(
+                registro["codigo"],
+                {
+                    "estado": "Pagado",
+                    "respuesta_deudor": "Pagar deuda",
+                    "fecha_respuesta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "accion_recomendada": "Archivar expediente tras comprobar pago",
+                    "borrador": borrador
+                }
+            )
+
+            st.success("Respuesta registrada: pago de deuda.")
+            st.text_area("Borrador generado", borrador, height=300)
+
+    with col2:
+        abrir_oposicion = st.button("Oponerse al pago", use_container_width=True)
+        if abrir_oposicion:
+            st.session_state.mostrar_oposicion = True
+
+    with col3:
+        if st.button("No pagar ni comparecer", use_container_width=True):
+            borrador = generar_borrador_no_comparece(registro)
+
+            actualizar_registro(
+                registro["codigo"],
+                {
+                    "estado": "Sin pago ni oposición",
+                    "respuesta_deudor": "No pagar ni comparecer",
+                    "fecha_respuesta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "accion_recomendada": "Iniciar ejecución por vía de apremio tras comprobar plazo",
+                    "borrador": borrador
+                }
+            )
+
+            st.warning("Respuesta registrada: no pago ni comparecencia.")
+            st.text_area("Borrador generado", borrador, height=300)
+
+    if st.session_state.get("mostrar_oposicion", False):
+        st.subheader("Formulario de oposición")
+
+        with st.form("form_oposicion"):
+            motivo = st.text_area(
+                "Motivo de oposición",
+                placeholder="Explica brevemente por qué te opones al pago..."
+            )
+
+            reconoce_parte = st.checkbox("Reconozco parte de la deuda")
+
+            cantidad_reconocida = 0.0
+            if reconoce_parte:
+                cantidad_reconocida = st.number_input(
+                    "Cantidad reconocida",
+                    min_value=0.0,
+                    step=100.0
+                )
+
+            enviar = st.form_submit_button("Registrar oposición")
+
+        if enviar:
+            motivo_final = motivo
+            if reconoce_parte:
+                motivo_final += f"\nCantidad reconocida: {cantidad_reconocida}"
+
+            borrador = generar_borrador_oposicion(registro, motivo_final)
+
+            actualizar_registro(
+                registro["codigo"],
+                {
+                    "estado": "Oposición presentada",
+                    "respuesta_deudor": "Oponerse al pago",
+                    "fecha_respuesta": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "motivo_oposicion": motivo_final,
+                    "accion_recomendada": "Dar traslado de la oposición y continuar según cuantía",
+                    "borrador": borrador
+                }
+            )
+
+            st.success("Oposición registrada correctamente.")
+            st.text_area("Borrador generado", borrador, height=320)
+
+
+# ============================================================
+# DASHBOARD
+# ============================================================
+
+def pantalla_dashboard():
+    st.title("Panel de seguimiento")
+
+    df = cargar_registros()
+
+    if df.empty:
+        st.info("Todavía no hay expedientes registrados.")
+        return
+
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("Total expedientes", len(df))
+    c2.metric("Pendientes", int((df["estado"] == "Pendiente de respuesta del deudor").sum()))
+    c3.metric("Pagados", int((df["estado"] == "Pagado").sum()))
+    c4.metric("Oposiciones", int((df["estado"] == "Oposición presentada").sum()))
+
+
+# ============================================================
+# EJECUCIÓN PRINCIPAL
+# ============================================================
+
+if not st.session_state.autenticado:
+    pantalla_login()
     st.stop()
 
-# ============================================================
-# MENÚ PRINCIPAL
-# ============================================================
-
 with st.sidebar:
-    st.success("Certificado validado")
-    modo = get_storage_mode()
-    st.caption(f"Almacenamiento: {'Google Sheets' if modo == 'sheets' else 'CSV local de demo'}")
-    if st.button("Cerrar sesión"):
+    st.title("LexMonitor AI")
+
+    if st.button("Cambiar perfil", use_container_width=True):
+        st.session_state.perfil = None
+        st.rerun()
+
+    if st.button("Cerrar sesión", use_container_width=True):
         st.session_state.autenticado = False
         st.session_state.perfil = None
         st.rerun()
 
-st.header("Selecciona tu perfil")
-col_a, col_b = st.columns(2)
-with col_a:
-    if st.button("👤 Demandante / Acreedor", use_container_width=True, type="primary"):
-        st.session_state.perfil = "demandante"
-with col_b:
-    if st.button("👤 Demandado / Deudor", use_container_width=True):
-        st.session_state.perfil = "demandado"
+    st.divider()
 
-st.divider()
+    ver_dashboard = st.checkbox("Mostrar panel de seguimiento")
 
-# ============================================================
-# PERFIL DEMANDANTE
-# ============================================================
+if st.session_state.perfil is None:
+    pantalla_perfiles()
+    st.stop()
+
+if ver_dashboard:
+    pantalla_dashboard()
+    st.stop()
 
 if st.session_state.perfil == "demandante":
-    st.header("📄 Zona del Demandante / Acreedor")
-
-    tab_pdf, tab_form = st.tabs(["1. Subir PDF/plantilla de demanda", "2. Rellenar formulario desde la app"])
-
-    datos_demanda = None
-    texto_demanda = ""
-
-    with tab_pdf:
-        demanda_pdf = st.file_uploader("Sube la plantilla de demanda monitoria rellena", type=["pdf", "docx", "txt"], key="demanda_file")
-        if demanda_pdf:
-            texto_demanda = leer_documento(demanda_pdf)
-            st.text_area("Texto leído de la demanda", texto_demanda, height=220)
-            datos_demanda = extraer_datos_demanda(texto_demanda, "")
-            st.session_state["texto_demanda"] = texto_demanda
-            st.session_state["datos_demanda_base"] = datos_demanda
-
-    with tab_form:
-        with st.form("form_demanda_manual"):
-            c1, c2 = st.columns(2)
-            demandante_manual = c1.text_input("Demandante / acreedor")
-            email_demandante_manual = c2.text_input("Email del demandante")
-            c1, c2 = st.columns(2)
-            demandado_manual = c1.text_input("Demandado / deudor")
-            email_demandado_manual = c2.text_input("Email del demandado")
-            cuantia_manual = st.number_input("Cuantía reclamada (€)", min_value=0.0, step=100.0)
-            concepto_manual = st.text_input("Concepto de la deuda")
-            hechos_manual = st.text_area("Hechos principales", height=150)
-            usar_form = st.form_submit_button("Usar estos datos")
-        if usar_form:
-            texto_demanda = f"Demandante: {demandante_manual}. Demandado: {demandado_manual}. Cuantía: {cuantia_manual}. Concepto: {concepto_manual}. Hechos: {hechos_manual}"
-            datos_demanda = {
-                "demandante": demandante_manual,
-                "demandado": demandado_manual,
-                "cuantia": cuantia_manual,
-                "concepto_deuda": concepto_manual,
-                "hechos_resumidos": hechos_manual,
-                "menciona_monitorio": True,
-                "deuda_ok_texto": True,
-                "documentacion_valida": False,
-                "documentos_art_812": {},
-                "categorias_detectadas": [],
-                "datos_faltantes": [],
-                "cumple_requisitos_auto": False,
-                "email_demandante": email_demandante_manual,
-                "email_demandado": email_demandado_manual,
-            }
-            st.session_state["texto_demanda"] = texto_demanda
-            st.session_state["datos_demanda_base"] = datos_demanda
-            st.success("Datos de demanda cargados desde formulario.")
-
-    datos_base = st.session_state.get("datos_demanda_base")
-    texto_demanda_guardado = st.session_state.get("texto_demanda", "")
-
-    st.subheader("📎 Documentos / pruebas para admisión art. 812 LEC")
-    documentos = st.file_uploader(
-        "Sube facturas, albaranes, certificaciones, documentos firmados, etc.",
-        type=["pdf", "docx", "txt"],
-        accept_multiple_files=True,
-        key="docs_812",
-    )
-
-    texto_documentos = ""
-    nombres_docs = []
-    if documentos:
-        partes = []
-        for doc in documentos:
-            nombres_docs.append(doc.name)
-            partes.append(f"\n--- DOCUMENTO: {doc.name} ---\n{leer_documento(doc)}")
-        texto_documentos = "\n".join(partes)
-        st.text_area("Texto leído de documentos", texto_documentos, height=220)
-
-    if datos_base:
-        datos_finales = extraer_datos_demanda(texto_demanda_guardado, texto_documentos)
-        datos_finales["email_demandante"] = datos_base.get("email_demandante", "")
-        datos_finales["email_demandado"] = datos_base.get("email_demandado", "")
-
-        # Si el PDF no detectó bien, mantenemos lo que venga del formulario o permitimos editar.
-        st.subheader("✅ Validación de datos antes de registrar")
-        with st.form("validar_registro"):
-            c1, c2 = st.columns(2)
-            demandante = c1.text_input("Demandante / acreedor", value=datos_finales.get("demandante") or datos_base.get("demandante", ""))
-            demandado = c2.text_input("Demandado / deudor", value=datos_finales.get("demandado") or datos_base.get("demandado", ""))
-            c1, c2 = st.columns(2)
-            email_demandante = c1.text_input("Email demandante", value=datos_finales.get("email_demandante", ""))
-            email_demandado = c2.text_input("Email demandado", value=datos_finales.get("email_demandado", ""))
-            cuantia = st.number_input("Cuantía (€)", min_value=0.0, value=float(datos_finales.get("cuantia") or datos_base.get("cuantia") or 0.0), step=100.0)
-            concepto = st.text_input("Concepto de la deuda", value=datos_finales.get("concepto_deuda") or datos_base.get("concepto_deuda", ""))
-            hechos = st.text_area("Hechos", value=datos_finales.get("hechos_resumidos") or datos_base.get("hechos_resumidos", ""), height=130)
-
-            documentacion_valida = st.checkbox(
-                "Documentación válida según art. 812 LEC",
-                value=bool(datos_finales.get("documentacion_valida")),
-            )
-
-            st.markdown("**Categorías detectadas art. 812 LEC**")
-            docs_812 = datos_finales.get("documentos_art_812", {})
-            for categoria, coincidencias in docs_812.items():
-                if coincidencias:
-                    st.success(f"{categoria}: {', '.join(coincidencias)}")
-                else:
-                    st.info(f"{categoria}: no detectado")
-
-            registrar = st.form_submit_button("Generar código de demanda y registrar", type="primary")
-
-        if registrar:
-            faltantes = []
-            if not demandante:
-                faltantes.append("demandante")
-            if not demandado:
-                faltantes.append("demandado")
-            if cuantia <= 0:
-                faltantes.append("cuantía")
-            if not documentacion_valida:
-                faltantes.append("documentación art. 812 LEC")
-
-            codigo = generar_codigo()
-            categorias = datos_finales.get("categorias_detectadas", [])
-
-            estado = "Pendiente de respuesta del deudor" if not faltantes else "Pendiente de subsanación"
-            accion = "Notificar al demandado para pagar u oponerse" if not faltantes else "Requerir subsanación al demandante"
-
-            temp_record = {
-                "codigo": codigo,
-                "demandante": demandante,
-                "demandado": demandado,
-                "cuantia": cuantia,
-            }
-            borrador = generar_borrador_admision(temp_record) if not faltantes else generar_borrador_subsanacion({"datos_faltantes": faltantes})
-
-            record = {
-                "codigo": codigo,
-                "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "estado": estado,
-                "rol_ultima_accion": "Demandante / Acreedor",
-                "demandante": demandante,
-                "email_demandante": email_demandante,
-                "demandado": demandado,
-                "email_demandado": email_demandado,
-                "cuantia": cuantia,
-                "concepto_deuda": concepto,
-                "hechos": hechos,
-                "documentacion_valida": "Sí" if documentacion_valida else "No",
-                "categorias_art_812": "; ".join(categorias),
-                "documentos_subidos": "; ".join(nombres_docs),
-                "respuesta_deudor": "",
-                "motivo_oposicion": "",
-                "fecha_respuesta_deudor": "",
-                "accion_recomendada": accion,
-                "borrador": borrador,
-            }
-            save_record(record)
-
-            if faltantes:
-                st.warning("Expediente registrado, pero pendiente de subsanación: " + ", ".join(faltantes))
-            else:
-                st.success("Demanda registrada correctamente.")
-
-            st.code(codigo, language="text")
-            st.text_area("Borrador generado", borrador, height=300)
-            st.info("Entrega este código al demandado/deudor para que pueda consultar la reclamación y responder.")
-    else:
-        st.info("Sube una demanda o rellena el formulario para continuar.")
-
-# ============================================================
-# PERFIL DEMANDADO
-# ============================================================
+    pantalla_demandante()
 
 elif st.session_state.perfil == "demandado":
-    st.header("📬 Zona del Demandado / Deudor")
-    codigo_busqueda = st.text_input("Introduce el código de demanda", placeholder="Ejemplo: MON-2026-ABC123")
-
-    if st.button("Buscar demanda", type="primary") and codigo_busqueda:
-        st.session_state["codigo_consultado"] = codigo_busqueda.strip().upper()
-
-    codigo_actual = st.session_state.get("codigo_consultado")
-    if codigo_actual:
-        record = get_record(codigo_actual)
-        if not record:
-            st.error("No se ha encontrado ninguna demanda con ese código.")
-        else:
-            st.success("Demanda encontrada.")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Código", record.get("codigo", ""))
-            c2.metric("Estado", record.get("estado", ""))
-            c3.metric("Cuantía", f"{record.get('cuantia', '')} €")
-
-            st.subheader("Resumen de la reclamación")
-            st.write(f"**Demandante / acreedor:** {record.get('demandante', '')}")
-            st.write(f"**Demandado / deudor:** {record.get('demandado', '')}")
-            st.write(f"**Concepto de deuda:** {record.get('concepto_deuda', '')}")
-            st.write(f"**Hechos:** {record.get('hechos', '')}")
-            st.write(f"**Documentación aportada:** {record.get('documentos_subidos', '') or 'No consta'}")
-            st.write(f"**Categorías art. 812 LEC:** {record.get('categorias_art_812', '') or 'No consta'}")
-            st.write(f"**Actuación recomendada actual:** {record.get('accion_recomendada', '')}")
-
-            st.subheader("Respuesta del demandado")
-            c1, c2, c3 = st.columns(3)
-
-            with c1:
-                if st.button("💳 Pagar deuda", use_container_width=True):
-                    borrador = generar_borrador_respuesta(record, "Pagado")
-                    update_record(record["codigo"], {
-                        "estado": "Pagado. Pendiente de comprobación y archivo",
-                        "rol_ultima_accion": "Demandado / Deudor",
-                        "respuesta_deudor": "Pagado",
-                        "fecha_respuesta_deudor": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "accion_recomendada": "Comprobar pago y archivar actuaciones",
-                        "borrador": borrador,
-                    })
-                    st.success("Respuesta registrada: pago de deuda.")
-                    st.text_area("Borrador generado", borrador, height=260)
-
-            with c2:
-                abrir_oposicion = st.button("✍️ Oponerse al pago", use_container_width=True)
-                if abrir_oposicion:
-                    st.session_state["mostrar_oposicion"] = True
-
-            with c3:
-                if st.button("⏳ No pagar ni comparecer", use_container_width=True):
-                    borrador = generar_borrador_respuesta(record, "No comparece")
-                    update_record(record["codigo"], {
-                        "estado": "Sin pago ni comparecencia. Procede ejecución",
-                        "rol_ultima_accion": "Demandado / Deudor",
-                        "respuesta_deudor": "No paga ni comparece",
-                        "fecha_respuesta_deudor": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "accion_recomendada": "Dar por terminado el monitorio y despachar ejecución",
-                        "borrador": borrador,
-                    })
-                    st.warning("Respuesta registrada: no pago ni comparecencia.")
-                    st.text_area("Borrador generado", borrador, height=260)
-
-            if st.session_state.get("mostrar_oposicion"):
-                with st.form("form_oposicion"):
-                    motivo = st.text_area("Motivo de oposición", height=160)
-                    doc_oposicion = st.file_uploader("Documento de oposición, si existe", type=["pdf", "docx", "txt"], key="doc_oposicion")
-                    enviar_oposicion = st.form_submit_button("Registrar oposición")
-                if enviar_oposicion:
-                    borrador = generar_borrador_respuesta(record, "Oposición presentada", motivo)
-                    update_record(record["codigo"], {
-                        "estado": "Oposición presentada",
-                        "rol_ultima_accion": "Demandado / Deudor",
-                        "respuesta_deudor": "Oposición presentada",
-                        "motivo_oposicion": motivo,
-                        "fecha_respuesta_deudor": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "accion_recomendada": "Dar traslado al demandante y determinar procedimiento por cuantía",
-                        "borrador": borrador,
-                    })
-                    st.success("Oposición registrada correctamente.")
-                    st.text_area("Borrador generado", borrador, height=300)
-                    st.session_state["mostrar_oposicion"] = False
-
-else:
-    st.info("Elige si accedes como Demandante/Acreedor o como Demandado/Deudor.")
-
-# ============================================================
-# DASHBOARD INTERNO DE DEMO
-# ============================================================
-
-st.divider()
-with st.expander("📊 Ver registros guardados - demo"):
-    df = load_data()
-    if df.empty:
-        st.info("Todavía no hay expedientes registrados.")
-    else:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    pantalla_demandado()
