@@ -2,3 +2,5 @@ streamlit
 pandas
 python-docx
 PyPDF2
+gspread
+google-auth
